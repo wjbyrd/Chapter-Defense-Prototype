@@ -942,7 +942,10 @@ let state = {
   autoFireTimers: {},
   awaitingWaveQuestion: false,
   awaitingWaveUpgradeChoice: false,
-  killsSinceLastQuestion: 0
+  killsSinceLastQuestion: 0,
+  setupMode: false,
+  selectedBuildType: null,
+  starterBuildsRemaining: 3
 };
 
 const lane = document.getElementById("lane");
@@ -1026,10 +1029,61 @@ function resetLevelState() {
   state.awaitingWaveUpgradeChoice = false;
   state.autoFireTimers = {};
   state.killsSinceLastQuestion = 0;
+  state.setupMode = false;
+  state.selectedBuildType = null;
+  state.starterBuildsRemaining = 3;
   questionOverlay.classList.remove("active");
   resultBox.className = "resultbox";
   resultBox.textContent = "";
   clearBattlefieldEntities();
+  renderPlacedTowers();
+}
+
+function renderPlacedTowers() {
+  document.querySelectorAll(".placed-tower").forEach(el => el.remove());
+
+  campaign.towers.forEach(tower => {
+    const slot = getSlotById(tower.slotId);
+    if (!slot) return;
+
+    const towerEl = document.createElement("div");
+    towerEl.className = "tower placed-tower";
+    towerEl.style.left = `${slot.x - 32}px`;
+
+    towerEl.innerHTML = `
+      <div class="tower-name">${TOWER_TYPES[tower.type].name.replace(" Tower", "")}</div>
+      <div class="charge"><div class="charge-fill"></div></div>
+    `;
+
+    lane.appendChild(towerEl);
+  });
+}
+  
+function getPlacedTowerInSlot(slotId) {
+  return campaign.towers.find(tower => tower.slotId === slotId) || null;
+}
+
+function getOpenSlots() {
+  return getCurrentWorldLayout().slots.filter(slot => !getPlacedTowerInSlot(slot.id));
+}
+
+function buildTower(type, slotId) {
+  const typeDef = TOWER_TYPES[type];
+  if (!typeDef) return false;
+  if (campaign.gold < typeDef.buildCost) return false;
+  if (getPlacedTowerInSlot(slotId)) return false;
+
+  campaign.gold -= typeDef.buildCost;
+  campaign.towers.push({
+    id: campaign.nextTowerId++,
+    type,
+    level: 1,
+    slotId
+  });
+
+  updateStats();
+  renderPlacedTowers();
+  return true;
 }
 
 function loadLevel(levelIndex) {
@@ -1826,9 +1880,120 @@ function startFromMap(levelIndex) {
   questionOverlay.classList.remove("active");
   state.questionOpen = false;
   logBox.innerHTML = "";
-  startLevel(levelIndex);
+
+  loadLevel(levelIndex);
+  resetLevelState();
+
+  campaign.towers = [];
+  campaign.gold = STARTING_GOLD;
+  state.starterBuildsRemaining = 3;
+  state.selectedBuildType = null;
+  state.setupMode = true;
+
+  updateStats();
+  renderPlacedTowers();
+  showTowerSetupOverlay();
 }
 
+function showTowerSetupOverlay() {
+  state.paused = true;
+  state.questionOpen = true;
+  questionOverlay.classList.add("active");
+
+  questionTitle.textContent = state.currentLevel.name;
+  questionTag.textContent = "Tower Setup";
+  questionText.textContent = `Choose and place ${state.starterBuildsRemaining} starting tower${state.starterBuildsRemaining === 1 ? "" : "s"}.`;
+
+  const towerButtons = Object.values(TOWER_TYPES).map(tower => {
+    const selected = state.selectedBuildType === tower.key;
+    const disabled = campaign.gold < tower.buildCost || state.starterBuildsRemaining <= 0;
+    return `
+      <button
+        class="${selected ? "primary" : "secondary"}"
+        ${disabled ? "disabled" : ""}
+        onclick="selectBuildType('${tower.key}')"
+      >
+        ${tower.name} (${tower.buildCost}g)
+      </button>
+    `;
+  }).join("");
+
+  const slotButtons = getCurrentWorldLayout().slots.map(slot => {
+    const placed = getPlacedTowerInSlot(slot.id);
+    return `
+      <button
+        class="${placed ? "secondary" : "primary"}"
+        ${placed || !state.selectedBuildType || state.starterBuildsRemaining <= 0 ? "disabled" : ""}
+        onclick="placeStarterTower(${slot.id})"
+      >
+        ${placed ? `${TOWER_TYPES[placed.type].name}` : `Slot ${slot.id + 1}`}
+      </button>
+    `;
+  }).join("");
+
+  answersBox.innerHTML = `
+    <div class="active-upgrades">
+      <strong>Starting Gold</strong>
+      <div class="pill-list">
+        <span class="pill">Gold: ${campaign.gold}</span>
+        <span class="pill">Towers left to place: ${state.starterBuildsRemaining}</span>
+        <span class="pill">Placed Towers: ${campaign.towers.length}</span>
+      </div>
+    </div>
+
+    <div class="active-upgrades">
+      <strong>Choose Tower Type</strong>
+      <div class="controls">${towerButtons}</div>
+    </div>
+
+    <div class="active-upgrades">
+      <strong>Choose Slot</strong>
+      <div class="controls">${slotButtons}</div>
+    </div>
+
+    <div class="controls">
+      <button class="primary" ${state.starterBuildsRemaining === 0 ? "" : "disabled"} onclick="beginBattleAfterSetup()">Start Battle</button>
+      <button class="secondary" onclick="showLevelMap()">Back to Map</button>
+    </div>
+  `;
+
+  resultBox.className = "resultbox good";
+  resultBox.textContent = "Build your opening defense before the first wave begins.";
+}
+
+function selectBuildType(type) {
+  state.selectedBuildType = type;
+  showTowerSetupOverlay();
+}
+
+function placeStarterTower(slotId) {
+  if (!state.setupMode) return;
+  if (!state.selectedBuildType) return;
+  if (state.starterBuildsRemaining <= 0) return;
+
+  const built = buildTower(state.selectedBuildType, slotId);
+  if (!built) return;
+
+  state.starterBuildsRemaining--;
+  state.selectedBuildType = null;
+  showTowerSetupOverlay();
+}
+
+function beginBattleAfterSetup() {
+  if (state.starterBuildsRemaining > 0) return;
+
+  state.setupMode = false;
+  state.questionOpen = false;
+  state.paused = false;
+  questionOverlay.classList.remove("active");
+
+  state.running = true;
+  state.lastFrame = performance.now();
+  showWaveBanner("Wave 1");
+  logMessage(`Starting ${state.currentLevel.name}. Opening towers placed.`, "note");
+  requestAnimationFrame(gameLoop);
+}
+  
 function completeLevel() {
   if (state.gameOver) return;
   state.running = false;
@@ -1934,17 +2099,20 @@ function startNextLevel() {
   logBox.innerHTML = "";
   startLevel(state.currentLevelIndex + 1);
 }
-
+  
 function resetCampaign() {
   campaign.unlockedLevel = 1;
   campaign.bestStars = {};
-  campaign.gold = 0;
+  campaign.gold = STARTING_GOLD;
+  campaign.towers = [];
+  campaign.nextTowerId = 1;
   campaign.conceptMemory = {};
   logBox.innerHTML = "";
   resetLevelState();
   loadLevel(0);
+  renderPlacedTowers();
   showLevelMap();
-  logMessage("Campaign reset. Gold wiped. Towers reset. Chapter memory wiped.", "note");
+  logMessage("Campaign reset. Gold wiped. Towers cleared. Chapter memory wiped.", "note");
 }
 
 function gameLoop(timestamp) {
@@ -1971,6 +2139,9 @@ window.showLevelMap = showLevelMap;
 window.startNextWave = startNextWave;
 window.showTowerGuide = showTowerGuide;
 window.closeOverlayResume = closeOverlayResume;
+window.selectBuildType = selectBuildType;
+window.placeStarterTower = placeStarterTower;
+window.beginBattleAfterSetup = beginBattleAfterSetup;
 
 loadLevel(0);
 showLevelMap();
