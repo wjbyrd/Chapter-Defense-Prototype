@@ -657,22 +657,6 @@
 
     <div class="lane" id="lane">
       <div class="groundline"></div>
-
-     <div class="tower t1">
-      <div class="tower-name">Preference Tower</div>
-      <div class="charge"><div class="charge-fill" id="charge1"></div></div>
-    </div>
-
-    <div class="tower t2">
-      <div class="tower-name">Budget Tower</div>
-      <div class="charge"><div class="charge-fill" id="charge2"></div></div>
-    </div>
-
-   <div class="tower t3">
-      <div class="tower-name">Utility Tower</div>
-      <div class="charge"><div class="charge-fill" id="charge3"></div></div>
-   </div>
-
       <div class="gate"></div>
     </div>
 
@@ -959,11 +943,10 @@ let state = {
   tagHistory: [],
   askedQuestionIds: [],
   askedTagsThisLevel: {},
-  autoFireTimers: {}
-  },
+  autoFireTimers: {},
   awaitingWaveQuestion: false,
   awaitingWaveUpgradeChoice: false,
-  killsSinceLastQuestion: 0,
+  killsSinceLastQuestion: 0
 };
 
 const lane = document.getElementById("lane");
@@ -1072,7 +1055,6 @@ function startLevel(levelIndex) {
   state.running = true;
   state.lastFrame = performance.now();
   levelHeading.textContent = state.currentLevel.name;
-  updateTowerVisuals();
   showWaveBanner("Wave 1");
   logMessage(`Starting ${state.currentLevel.name}. Towers now auto-fire. Questions gate upgrades.`, "note");
   requestAnimationFrame(gameLoop);
@@ -1237,14 +1219,12 @@ function showWaveQuestionGate() {
 }
 
 function renderWaveShopHTML() {
-  const towers = getTowerDefinitions();
   return `
     <div class="wave-shop">
       <h4>Spend Gold Before the Next Wave</h4>
       <div class="gold-line">Current Gold: ${campaign.gold}</div>
       <div class="shop-grid">
         ${towers.map(tower => {
-          const nextCost = getTowerUpgradeCost(tower.role);
           const canAfford = campaign.gold >= nextCost;
           const detail = tower.role === "single"
             ? `Damage ${tower.damage} → ${tower.damage + 1}, Tank Bonus ${tower.bonusVsTank} → ${tower.bonusVsTank + 1}`
@@ -1715,7 +1695,6 @@ function getChapterPersistenceHTML() {
 }
 
 function renderTowerGuideHTML() {
-  const towers = getTowerDefinitions();
   return `
     <div class="upgrade-grid">
       ${towers.map(tower => {
@@ -1847,9 +1826,6 @@ function showLevelMap() {
       <strong>Run Economy</strong>
       <div class="pill-list">
         <span class="pill">Gold: ${campaign.gold}</span>
-        <span class="pill">Preference L${campaign.towerLevels.single}</span>
-        <span class="pill">Budget L${campaign.towerLevels.aoe}</span>
-        <span class="pill">Utility L${campaign.towerLevels.slow}</span>
       </div>
     </div>
     <div class="active-upgrades">
@@ -1988,7 +1964,6 @@ function resetCampaign() {
   logBox.innerHTML = "";
   resetLevelState();
   loadLevel(0);
-  updateTowerVisuals();
   showLevelMap();
   logMessage("Campaign reset. Gold wiped. Towers reset. Chapter memory wiped.", "note");
 }
@@ -2020,7 +1995,6 @@ window.showTowerGuide = showTowerGuide;
 window.closeOverlayResume = closeOverlayResume;
 
 loadLevel(0);
-updateTowerVisuals();
 showLevelMap();
 logMessage("Campaign ready. Continuous combat is live.", "note");
 
