@@ -755,9 +755,9 @@ const ENEMY_TYPES = {
 };
 
 const BASE_TOWERS = [
-  { key: "single", name: "Preference Tower", x: 212, y: 245, baseDamage: 0.5, bonusVsBoss: 1, cooldown: 2500, upgradeType: "Boss damage", upgradeCostBase: 14 },
-  { key: "aoe", name: "Budget Tower", x: 372, y: 245, baseDamage: 0.5, splashRadius: 50, cooldown: 3000, upgradeType: "Splash damage", upgradeCostBase: 14 },
-  { key: "slow", name: "Utility Tower", x: 532, y: 245, baseDamage: 0, slowAmount: 0.15, slowDuration: 1000, cooldown: 1600, upgradeType: "Slow strength", upgradeCostBase: 14 }
+  { key: "single", name: "Preference Tower", x: 212, y: 245, baseDamage: 0.5, bonusVsTank: 1, fireCooldown: 2500, upgradeType: "Tank damage", upgradeCostBase: 14 },
+  { key: "aoe", name: "Budget Tower", x: 372, y: 245, baseDamage: 0.5, splashRadius: 50, fireCooldown: 3000, upgradeType: "Splash damage", upgradeCostBase: 14 },
+  { key: "slow", name: "Utility Tower", x: 532, y: 245, baseDamage: 0, slowAmount: 0.15, slowDuration: 1000, fireCooldown: 1600, upgradeType: "Slow strength", upgradeCostBase: 14 }
 ];
 
 const LEVELS = [
