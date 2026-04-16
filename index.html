@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Chapter Defense Prototype</title>
+<title>Chapter Defense Prototype - Level Progression</title>
 <style>
   :root{
     --bg:#111827;
@@ -275,9 +275,10 @@
   button:hover{ filter:brightness(.95); }
   button.primary{ background:var(--accent); }
   button.secondary{ background:#cbd5e1; }
+  button.danger{ background:#fca5a5; }
 
   .log{
-    height:180px;
+    height:220px;
     overflow:auto;
     background:#020617;
     border:1px solid #1e293b;
@@ -309,7 +310,7 @@
   .overlay.active{ display:flex; }
 
   .question-card{
-    width:min(700px, 95%);
+    width:min(760px, 95%);
     background:#0f172a;
     border:1px solid #334155;
     border-radius:18px;
@@ -390,6 +391,67 @@
 
   .wave-banner.show{ opacity:1; }
 
+  .stars{
+    font-size:2rem;
+    letter-spacing:8px;
+    margin:10px 0 14px 0;
+  }
+
+  .star-on{ color:#fbbf24; }
+  .star-off{ color:#475569; }
+
+  .summary-grid{
+    display:grid;
+    grid-template-columns:repeat(3, minmax(120px, 1fr));
+    gap:12px;
+    margin:16px 0;
+  }
+
+  .summary-box{
+    background:#111827;
+    border:1px solid #334155;
+    border-radius:12px;
+    padding:12px;
+    text-align:center;
+  }
+
+  .summary-box .label{
+    display:block;
+    color:#94a3b8;
+    font-size:.82rem;
+    margin-bottom:6px;
+  }
+
+  .summary-box .value{
+    font-size:1.2rem;
+    font-weight:bold;
+  }
+
+  .level-list{
+    display:grid;
+    gap:10px;
+    margin-top:14px;
+  }
+
+  .level-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    background:#111827;
+    border:1px solid #334155;
+    border-radius:12px;
+    padding:12px 14px;
+  }
+
+  .level-row.locked{
+    opacity:.55;
+  }
+
+  .mini-stars{
+    letter-spacing:3px;
+    font-size:1rem;
+  }
+
   @media (max-width: 900px){
     .bottompanel{
       grid-template-columns:1fr;
@@ -406,6 +468,7 @@
     .tower.t2{ left:145px; }
     .tower.t3{ left:260px; }
     .gate{ width:72px; }
+    .summary-grid{ grid-template-columns:1fr; }
   }
 </style>
 </head>
@@ -414,13 +477,13 @@
 
   <div class="topbar">
     <div class="titlebox">
-      <h1>Prototype: Consumer Choice Defense</h1>
-      <p>Answer questions to power your defenses and stop the advancing army.</p>
+      <h1 id="chapterHeading">Consumer Choice Defense</h1>
+      <p id="levelHeading">Defend the chapter. Beat levels. Earn stars.</p>
     </div>
 
     <div class="stats">
       <div class="stat"><span class="label">Gate Health</span><span class="value" id="gateHealthStat">10</span></div>
-      <div class="stat"><span class="label">Wave</span><span class="value" id="waveStat">0 / 3</span></div>
+      <div class="stat"><span class="label">Wave</span><span class="value" id="waveStat">0 / 0</span></div>
       <div class="stat"><span class="label">Enemies Left</span><span class="value" id="enemyCountStat">0</span></div>
       <div class="stat"><span class="label">Accuracy</span><span class="value" id="accuracyStat">0%</span></div>
     </div>
@@ -451,11 +514,11 @@
       <div class="gate"></div>
     </div>
 
-    <div class="overlay" id="questionOverlay">
-      <div class="question-card">
-        <h3 id="questionTitle">Question</h3>
-        <div class="tag" id="questionTag">Tag</div>
-        <div class="qtext" id="questionText"></div>
+    <div class="overlay active" id="questionOverlay">
+      <div class="question-card" id="overlayCard">
+        <h3 id="questionTitle">Consumer Choice Defense</h3>
+        <div class="tag" id="questionTag">Prototype Campaign</div>
+        <div class="qtext" id="questionText">Press start and see whether this thing has any guts.</div>
         <div class="answers" id="answersBox"></div>
         <div class="resultbox" id="resultBox"></div>
       </div>
@@ -469,12 +532,12 @@
     </div>
 
     <div class="panel">
-      <h2>Prototype Notes</h2>
-      <p>This version keeps the map fixed and the defenses simple. Students answer questions. Correct answers charge all towers and fire at the nearest enemy. Wrong answers damage the gate.</p>
-      <p>That means the learning loop is front and center instead of being buried under tower placement chaos.</p>
+      <h2>What Changed</h2>
+      <p>This version breaks the prototype into actual levels. Beat one, get rated, unlock the next. That’s where progression starts feeling like a game instead of a sandbox punch-up.</p>
+      <p>Stars are based on survival, gate health, and accuracy. So students can pass a level, but dominating it still matters.</p>
       <div class="controls">
-        <button class="primary" id="startBtn">Start Prototype</button>
-        <button class="secondary" id="resetBtn">Reset</button>
+        <button class="primary" id="openMapBtn">Open Level Map</button>
+        <button class="secondary" id="resetCampaignBtn">Reset Campaign</button>
       </div>
     </div>
   </div>
@@ -483,35 +546,68 @@
 
 <script>
 /* =========================================================
-   SAFE TO EDIT: CHAPTER / LEVEL INFO
+   SAFE TO EDIT: CHAPTER / CAMPAIGN STRUCTURE
    ========================================================= */
-const GAME_CONFIG = {
-  chapterTitle: "Consumer Choice Defense",
-  levelTitle: "The Budget Gate",
-  totalWaves: 3,
-  gateHealth: 10,
-  enemySpeed: 0.45,
-  timeBetweenSpawns: 2200,
-  questionInterval: 4500,
-  projectileSpeed: 8
+const CHAPTER = {
+  title: "Consumer Choice Defense",
+  subtitle: "Hold the line across three prototype levels."
 };
 
 /* =========================================================
-   SAFE TO EDIT: WAVE DESIGN
-   hp = enemy health
-   count = number of enemies in that wave
+   SAFE TO EDIT: LEVEL DEFINITIONS
+   Each level can have its own gate health, timings, and waves.
    ========================================================= */
-const WAVES = [
-  { count: 4, hp: 2, speedMod: 1.0 },
-  { count: 5, hp: 3, speedMod: 1.1 },
-  { count: 1, hp: 8, speedMod: 0.8, boss: true }
+const LEVELS = [
+  {
+    id: 1,
+    name: "Level 1 - The Budget Gate",
+    description: "A light opening defense. Learn the loop and survive the first push.",
+    gateHealth: 10,
+    enemySpeed: 0.42,
+    timeBetweenSpawns: 2400,
+    questionInterval: 4800,
+    projectileSpeed: 8,
+    waves: [
+      { count: 3, hp: 2, speedMod: 1.0 },
+      { count: 4, hp: 2, speedMod: 1.05 },
+      { count: 1, hp: 6, speedMod: 0.8, boss: true }
+    ]
+  },
+  {
+    id: 2,
+    name: "Level 2 - The Indifference Fields",
+    description: "More pressure. More bodies. Less room for sloppy thinking.",
+    gateHealth: 9,
+    enemySpeed: 0.48,
+    timeBetweenSpawns: 2100,
+    questionInterval: 4300,
+    projectileSpeed: 8.5,
+    waves: [
+      { count: 4, hp: 2, speedMod: 1.0 },
+      { count: 5, hp: 3, speedMod: 1.08 },
+      { count: 1, hp: 8, speedMod: 0.9, boss: true }
+    ]
+  },
+  {
+    id: 3,
+    name: "Level 3 - Siege of Utility Keep",
+    description: "Final prototype test. Harder timing. Harder siege. No excuses.",
+    gateHealth: 8,
+    enemySpeed: 0.54,
+    timeBetweenSpawns: 1850,
+    questionInterval: 3900,
+    projectileSpeed: 9,
+    waves: [
+      { count: 5, hp: 2, speedMod: 1.02 },
+      { count: 5, hp: 3, speedMod: 1.12 },
+      { count: 1, hp: 10, speedMod: 0.95, boss: true }
+    ]
+  }
 ];
 
 /* =========================================================
    SAFE TO EDIT: QUESTION BANK
    correct = index of correct answer in answers array
-   feedback = what appears after answer
-   tag = concept grouping for future adaptation
    ========================================================= */
 const QUESTIONS = [
   {
@@ -544,7 +640,7 @@ const QUESTIONS = [
     text: "Indifference curves that cross each other would suggest:",
     answers: ["Consistent preferences", "Higher income", "A violation of rational preference ordering", "Perfect competition"],
     correct: 2,
-    feedback: "Correct. Crossing indifference curves breaks consistent ranking."
+    feedback: "Crossing curves wreck consistent ranking."
   },
   {
     tag: "Budget Constraint",
@@ -552,7 +648,7 @@ const QUESTIONS = [
     text: "An increase in income, holding prices fixed, causes the budget constraint to:",
     answers: ["Shift outward in a parallel way", "Rotate inward", "Rotate outward around one intercept", "Disappear"],
     correct: 0,
-    feedback: "Yep. Same slope, farther out."
+    feedback: "Same slope. Bigger opportunity set."
   },
   {
     tag: "Utility Maximization",
@@ -560,30 +656,37 @@ const QUESTIONS = [
     text: "If a consumer is not maximizing utility, the most likely issue is that:",
     answers: ["The last dollar spent on each good gives different marginal utility", "All goods have the same price", "Income is zero", "Preferences are complete"],
     correct: 0,
-    feedback: "Exactly. If marginal utility per dollar differs, the consumer can reallocate spending."
+    feedback: "Exactly. Reallocate spending until marginal utility per dollar lines up."
   }
 ];
 
 /* =========================================================
-   ENGINE STATE
+   CAMPAIGN STATE
    ========================================================= */
+const campaign = {
+  unlockedLevel: 1,
+  bestStars: {}
+};
+
 let state = {
   running: false,
   paused: false,
   gameOver: false,
-  gateHealth: GAME_CONFIG.gateHealth,
+  gateHealth: 0,
+  maxGateHealth: 0,
   waveIndex: 0,
   enemies: [],
   projectiles: [],
   enemyId: 0,
-  shotsFired: 0,
   totalAnswered: 0,
   totalCorrect: 0,
   lastFrame: 0,
   spawnTimer: 0,
   questionTimer: 0,
   enemiesSpawnedInWave: 0,
-  questionOpen: false
+  questionOpen: false,
+  currentLevelIndex: 0,
+  currentLevel: null
 };
 
 const lane = document.getElementById("lane");
@@ -595,6 +698,8 @@ const answersBox = document.getElementById("answersBox");
 const resultBox = document.getElementById("resultBox");
 const logBox = document.getElementById("logBox");
 const waveBanner = document.getElementById("waveBanner");
+const chapterHeading = document.getElementById("chapterHeading");
+const levelHeading = document.getElementById("levelHeading");
 
 const gateHealthStat = document.getElementById("gateHealthStat");
 const waveStat = document.getElementById("waveStat");
@@ -607,8 +712,8 @@ const chargeEls = [
   document.getElementById("charge3")
 ];
 
-document.getElementById("startBtn").addEventListener("click", startGame);
-document.getElementById("resetBtn").addEventListener("click", resetGame);
+document.getElementById("openMapBtn").addEventListener("click", showLevelMap);
+document.getElementById("resetCampaignBtn").addEventListener("click", resetCampaign);
 
 function logMessage(text, cls = "") {
   const div = document.createElement("div");
@@ -619,7 +724,11 @@ function logMessage(text, cls = "") {
 
 function updateStats() {
   gateHealthStat.textContent = state.gateHealth;
-  waveStat.textContent = `${Math.min(state.waveIndex + (state.running ? 1 : 0), GAME_CONFIG.totalWaves)} / ${GAME_CONFIG.totalWaves}`;
+  if (state.currentLevel) {
+    waveStat.textContent = `${Math.min(state.waveIndex + (state.running ? 1 : 0), state.currentLevel.waves.length)} / ${state.currentLevel.waves.length}`;
+  } else {
+    waveStat.textContent = "0 / 0";
+  }
   enemyCountStat.textContent = state.enemies.length;
   const acc = state.totalAnswered ? Math.round((state.totalCorrect / state.totalAnswered) * 100) : 0;
   accuracyStat.textContent = `${acc}%`;
@@ -631,29 +740,19 @@ function showWaveBanner(text) {
   setTimeout(() => waveBanner.classList.remove("show"), 1400);
 }
 
-function startGame() {
-  if (state.running) return;
-  resetGame(true);
-  state.running = true;
-  state.lastFrame = performance.now();
-  state.waveIndex = 0;
-  state.enemiesSpawnedInWave = 0;
-  showWaveBanner("Wave 1");
-  logMessage("The siege begins. Hold the line.", "note");
-  updateStats();
-  requestAnimationFrame(gameLoop);
+function clearBattlefieldEntities() {
+  document.querySelectorAll(".enemy, .projectile").forEach(el => el.remove());
+  chargeEls.forEach(el => el.style.width = "0%");
 }
 
-function resetGame(silent = false) {
+function resetLevelState() {
   state.running = false;
   state.paused = false;
   state.gameOver = false;
-  state.gateHealth = GAME_CONFIG.gateHealth;
   state.waveIndex = 0;
   state.enemies = [];
   state.projectiles = [];
   state.enemyId = 0;
-  state.shotsFired = 0;
   state.totalAnswered = 0;
   state.totalCorrect = 0;
   state.lastFrame = 0;
@@ -664,64 +763,80 @@ function resetGame(silent = false) {
   questionOverlay.classList.remove("active");
   resultBox.className = "resultbox";
   resultBox.textContent = "";
-  document.querySelectorAll(".enemy, .projectile").forEach(el => el.remove());
-  chargeEls.forEach(el => el.style.width = "0%");
-  if (!silent) logBox.innerHTML = "";
+  clearBattlefieldEntities();
+}
+
+function loadLevel(levelIndex) {
+  const level = LEVELS[levelIndex];
+  state.currentLevelIndex = levelIndex;
+  state.currentLevel = level;
+  state.gateHealth = level.gateHealth;
+  state.maxGateHealth = level.gateHealth;
+  chapterHeading.textContent = CHAPTER.title;
+  levelHeading.textContent = level.name;
   updateStats();
 }
 
-function spawnEnemy() {
-  const wave = WAVES[state.waveIndex];
-  const enemy = {
-    id: ++state.enemyId,
-    x: 10,
-    y: 210,
-    hp: wave.hp,
-    maxHp: wave.hp,
-    speed: GAME_CONFIG.enemySpeed * wave.speedMod,
-    boss: !!wave.boss,
-    element: null,
-    hpFill: null
-  };
-
-  const el = document.createElement("div");
-  el.className = "enemy";
-  if (enemy.boss) {
-    el.style.width = "58px";
-    el.style.height = "58px";
-    el.style.bottom = "86px";
-    el.style.background = "radial-gradient(circle at 30% 30%, #fcd34d, #92400e 70%)";
-    el.style.border = "2px solid #f59e0b";
-  }
-  const hpbar = document.createElement("div");
-  hpbar.className = "hpbar";
-  const hpfill = document.createElement("div");
-  hpfill.className = "hpfill";
-  hpbar.appendChild(hpfill);
-  el.appendChild(hpbar);
-
-  enemy.element = el;
-  enemy.hpFill = hpfill;
-
-  lane.appendChild(el);
-  state.enemies.push(enemy);
-
-  if (enemy.boss) {
-    logMessage("Boss wave. A siege brute enters the field.", "bad");
-  } else {
-    logMessage("Enemy unit advancing.", "note");
-  }
-  updateEnemyElement(enemy);
+function startLevel(levelIndex) {
+  loadLevel(levelIndex);
+  resetLevelState();
+  state.currentLevel = LEVELS[levelIndex];
+  state.gateHealth = state.currentLevel.gateHealth;
+  state.maxGateHealth = state.currentLevel.gateHealth;
+  state.running = true;
+  state.lastFrame = performance.now();
+  levelHeading.textContent = state.currentLevel.name;
+  logMessage(`Starting ${state.currentLevel.name}.`, "note");
+  showWaveBanner("Wave 1");
   updateStats();
+  requestAnimationFrame(gameLoop);
 }
 
-function updateEnemyElement(enemy) {
-  enemy.element.style.left = `${enemy.x}px`;
-  enemy.hpFill.style.width = `${Math.max(0, (enemy.hp / enemy.maxHp) * 100)}%`;
+function showLevelMap() {
+  state.running = false;
+  state.paused = true;
+  state.questionOpen = true;
+  questionOverlay.classList.add("active");
+
+  questionTitle.textContent = CHAPTER.title;
+  questionTag.textContent = "Level Map";
+  questionText.textContent = CHAPTER.subtitle;
+
+  const rows = LEVELS.map((level, index) => {
+    const unlocked = level.id <= campaign.unlockedLevel;
+    const stars = campaign.bestStars[level.id] || 0;
+    return `
+      <div class="level-row ${unlocked ? "" : "locked"}">
+        <div>
+          <div><strong>${level.name}</strong></div>
+          <div style="color:#94a3b8; font-size:.9rem; margin-top:4px;">${level.description}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div class="mini-stars">${renderMiniStars(stars)}</div>
+          ${unlocked
+            ? `<button class="primary" onclick="startFromMap(${index})">Play</button>`
+            : `<button disabled>Locked</button>`}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  answersBox.innerHTML = `
+    <div class="level-list">${rows}</div>
+  `;
+  resultBox.className = "resultbox";
+  resultBox.textContent = "";
+}
+
+function startFromMap(levelIndex) {
+  questionOverlay.classList.remove("active");
+  state.questionOpen = false;
+  logBox.innerHTML = "";
+  startLevel(levelIndex);
 }
 
 function openQuestion() {
-  if (state.questionOpen || state.gameOver) return;
+  if (state.questionOpen || state.gameOver || !state.currentLevel) return;
   state.paused = true;
   state.questionOpen = true;
 
@@ -754,17 +869,17 @@ function handleAnswer(question, selectedIndex) {
     state.totalCorrect++;
     resultBox.className = "resultbox good";
     resultBox.textContent = "Correct. Towers fire. " + question.feedback;
-    logMessage(`Correct: ${question.tag} answer powers the defenses.`, "good");
+    logMessage(`Correct: ${question.tag} powers the defenses.`, "good");
     fireTowerVolley();
   } else {
     resultBox.className = "resultbox bad";
     resultBox.textContent = "Wrong. The gate takes damage. " + question.feedback;
     state.gateHealth -= 1;
-    logMessage(`Wrong: ${question.tag} slip. The gate is hit for 1 damage.`, "bad");
+    logMessage(`Wrong: ${question.tag} error. Gate takes 1 damage.`, "bad");
     if (state.gateHealth <= 0) {
       state.gateHealth = 0;
       updateStats();
-      setTimeout(() => endGame(false), 700);
+      setTimeout(() => failLevel(), 700);
     }
   }
 
@@ -776,7 +891,7 @@ function handleAnswer(question, selectedIndex) {
       state.questionOpen = false;
       state.paused = false;
     }
-  }, 1100);
+  }, 1000);
 }
 
 function fireTowerVolley() {
@@ -791,7 +906,7 @@ function fireTowerVolley() {
     setTimeout(() => el.style.width = "0%", 250);
   });
 
-  towers.forEach((tower, idx) => {
+  towers.forEach(tower => {
     const target = getNearestEnemy();
     if (!target) return;
 
@@ -804,7 +919,7 @@ function fireTowerVolley() {
     state.projectiles.push({
       x: tower.x,
       y: tower.y,
-      speed: GAME_CONFIG.projectileSpeed,
+      speed: state.currentLevel.projectileSpeed,
       targetId: target.id,
       damage: 1,
       element: proj
@@ -815,6 +930,51 @@ function fireTowerVolley() {
 function getNearestEnemy() {
   if (!state.enemies.length) return null;
   return [...state.enemies].sort((a, b) => b.x - a.x)[0];
+}
+
+function spawnEnemy() {
+  const wave = state.currentLevel.waves[state.waveIndex];
+  const enemy = {
+    id: ++state.enemyId,
+    x: 10,
+    hp: wave.hp,
+    maxHp: wave.hp,
+    speed: state.currentLevel.enemySpeed * wave.speedMod,
+    boss: !!wave.boss,
+    element: null,
+    hpFill: null
+  };
+
+  const el = document.createElement("div");
+  el.className = "enemy";
+  if (enemy.boss) {
+    el.style.width = "58px";
+    el.style.height = "58px";
+    el.style.bottom = "86px";
+    el.style.background = "radial-gradient(circle at 30% 30%, #fcd34d, #92400e 70%)";
+    el.style.border = "2px solid #f59e0b";
+  }
+
+  const hpbar = document.createElement("div");
+  hpbar.className = "hpbar";
+  const hpfill = document.createElement("div");
+  hpfill.className = "hpfill";
+  hpbar.appendChild(hpfill);
+  el.appendChild(hpbar);
+
+  enemy.element = el;
+  enemy.hpFill = hpfill;
+  lane.appendChild(el);
+  state.enemies.push(enemy);
+
+  logMessage(enemy.boss ? "Boss wave unit enters." : "Enemy unit advancing.", enemy.boss ? "bad" : "note");
+  updateEnemyElement(enemy);
+  updateStats();
+}
+
+function updateEnemyElement(enemy) {
+  enemy.element.style.left = `${enemy.x}px`;
+  enemy.hpFill.style.width = `${Math.max(0, (enemy.hp / enemy.maxHp) * 100)}%`;
 }
 
 function updateProjectiles() {
@@ -856,8 +1016,14 @@ function destroyEnemy(enemy) {
   logMessage(enemy.boss ? "Boss unit destroyed." : "Enemy destroyed.", "good");
   updateStats();
 
-  if (state.waveIndex >= WAVES.length - 1 && state.enemies.length === 0 && state.enemiesSpawnedInWave >= WAVES[state.waveIndex].count) {
-    endGame(true);
+  const currentWave = state.currentLevel.waves[state.waveIndex];
+  const finishedFinalWave =
+    state.waveIndex === state.currentLevel.waves.length - 1 &&
+    state.enemies.length === 0 &&
+    state.enemiesSpawnedInWave >= currentWave.count;
+
+  if (finishedFinalWave) {
+    completeLevel();
   }
 }
 
@@ -872,12 +1038,12 @@ function advanceEnemies(delta) {
       enemy.element.remove();
       state.enemies = state.enemies.filter(e => e.id !== enemy.id);
       state.gateHealth -= enemy.boss ? 3 : 1;
-      logMessage(enemy.boss ? "Boss crashes into the gate for 3 damage." : "Enemy reaches the gate for 1 damage.", "bad");
+      logMessage(enemy.boss ? "Boss slams the gate for 3 damage." : "Enemy reaches the gate for 1 damage.", "bad");
       updateStats();
 
       if (state.gateHealth <= 0) {
         state.gateHealth = 0;
-        endGame(false);
+        failLevel();
         return;
       }
     }
@@ -885,12 +1051,12 @@ function advanceEnemies(delta) {
 }
 
 function handleWaveSpawning(delta) {
-  const wave = WAVES[state.waveIndex];
+  const wave = state.currentLevel.waves[state.waveIndex];
   if (!wave) return;
 
   state.spawnTimer += delta;
 
-  if (state.enemiesSpawnedInWave < wave.count && state.spawnTimer >= GAME_CONFIG.timeBetweenSpawns) {
+  if (state.enemiesSpawnedInWave < wave.count && state.spawnTimer >= state.currentLevel.timeBetweenSpawns) {
     state.spawnTimer = 0;
     spawnEnemy();
     state.enemiesSpawnedInWave++;
@@ -898,7 +1064,7 @@ function handleWaveSpawning(delta) {
   }
 
   if (state.enemiesSpawnedInWave >= wave.count && state.enemies.length === 0) {
-    if (state.waveIndex < WAVES.length - 1) {
+    if (state.waveIndex < state.currentLevel.waves.length - 1) {
       state.waveIndex++;
       state.enemiesSpawnedInWave = 0;
       state.spawnTimer = 0;
@@ -911,33 +1077,161 @@ function handleWaveSpawning(delta) {
 
 function handleQuestionTimer(delta) {
   state.questionTimer += delta;
-  if (state.questionTimer >= GAME_CONFIG.questionInterval) {
+  if (state.questionTimer >= state.currentLevel.questionInterval) {
     state.questionTimer = 0;
     openQuestion();
   }
 }
 
-function endGame(victory) {
+function calculateStars() {
+  const accuracy = state.totalAnswered ? Math.round((state.totalCorrect / state.totalAnswered) * 100) : 0;
+  const gateRatio = state.maxGateHealth ? state.gateHealth / state.maxGateHealth : 0;
+  let stars = 1;
+
+  if (accuracy >= 70) stars = 2;
+  if (accuracy >= 85 && gateRatio >= 0.6) stars = 3;
+
+  return { stars, accuracy, gateRatio };
+}
+
+function renderStars(count) {
+  let html = "";
+  for (let i = 1; i <= 3; i++) {
+    html += `<span class="${i <= count ? 'star-on' : 'star-off'}">★</span>`;
+  }
+  return html;
+}
+
+function renderMiniStars(count) {
+  let html = "";
+  for (let i = 1; i <= 3; i++) {
+    html += i <= count ? "★" : "☆";
+  }
+  return html;
+}
+
+function completeLevel() {
   if (state.gameOver) return;
   state.running = false;
   state.gameOver = true;
-  questionOverlay.classList.add("active");
   state.questionOpen = true;
+  questionOverlay.classList.add("active");
 
-  const acc = state.totalAnswered ? Math.round((state.totalCorrect / state.totalAnswered) * 100) : 0;
+  const result = calculateStars();
+  const levelId = state.currentLevel.id;
+  const oldBest = campaign.bestStars[levelId] || 0;
+  campaign.bestStars[levelId] = Math.max(oldBest, result.stars);
 
-  questionTitle.textContent = victory ? "Victory" : "Defeat";
-  questionTag.textContent = victory ? "Prototype Complete" : "Gate Fallen";
-  questionText.textContent = victory
-    ? `You held the line. Accuracy: ${acc}%. This proves the loop works: answer questions, power towers, stop the siege.`
-    : `The gate is down. Accuracy: ${acc}%. That’s useful too. Failure state works, and now you can tune pacing, damage, and question frequency.`;
-  answersBox.innerHTML = `<button class="primary" onclick="startGame()">Run Again</button>`;
-  resultBox.className = "resultbox " + (victory ? "good" : "bad");
-  resultBox.textContent = victory
-    ? "Prototype success. Now refine the feel."
-    : "Prototype failed. Good. That means it has stakes.";
-  logMessage(victory ? "Defense successful." : "The keep has fallen.", victory ? "good" : "bad");
+  if (levelId === campaign.unlockedLevel && campaign.unlockedLevel < LEVELS.length) {
+    campaign.unlockedLevel++;
+  }
+
+  const nextUnlocked = state.currentLevelIndex < LEVELS.length - 1 && campaign.unlockedLevel > levelId;
+  const finalLevel = state.currentLevelIndex === LEVELS.length - 1;
+
+  questionTitle.textContent = `${state.currentLevel.name} Cleared`;
+  questionTag.textContent = finalLevel ? "Campaign Victory" : "Level Complete";
+  questionText.textContent = finalLevel
+    ? "You cleared the final prototype level. Good. Now this thing has a real campaign spine."
+    : "Level complete. You survived the siege and earned a rating. That’s progression.";
+
+  answersBox.innerHTML = `
+    <div class="stars">${renderStars(result.stars)}</div>
+    <div class="summary-grid">
+      <div class="summary-box">
+        <span class="label">Accuracy</span>
+        <span class="value">${result.accuracy}%</span>
+      </div>
+      <div class="summary-box">
+        <span class="label">Gate Left</span>
+        <span class="value">${state.gateHealth}/${state.maxGateHealth}</span>
+      </div>
+      <div class="summary-box">
+        <span class="label">Best Stars</span>
+        <span class="value">${campaign.bestStars[levelId]} / 3</span>
+      </div>
+    </div>
+    <div class="controls">
+      ${nextUnlocked ? `<button class="primary" onclick="startNextLevel()">Next Level</button>` : ""}
+      ${!finalLevel ? `<button class="secondary" onclick="replayCurrentLevel()">Replay Level</button>` : `<button class="primary" onclick="showLevelMap()">Level Map</button>`}
+      ${finalLevel ? `<button class="secondary" onclick="replayCurrentLevel()">Replay Final Level</button>` : ""}
+      <button class="secondary" onclick="showLevelMap()">Level Map</button>
+    </div>
+  `;
+
+  resultBox.className = "resultbox good";
+  resultBox.textContent = result.stars === 3
+    ? "Three stars. That level got stomped."
+    : result.stars === 2
+      ? "Two stars. Solid, but not domination."
+      : "One star. You survived. Barely. Run it back.";
+
+  logMessage(`${state.currentLevel.name} completed with ${result.stars} star(s).`, "good");
   updateStats();
+}
+
+function failLevel() {
+  if (state.gameOver) return;
+  state.running = false;
+  state.gameOver = true;
+  state.questionOpen = true;
+  questionOverlay.classList.add("active");
+
+  const accuracy = state.totalAnswered ? Math.round((state.totalCorrect / state.totalAnswered) * 100) : 0;
+
+  questionTitle.textContent = `${state.currentLevel.name} Failed`;
+  questionTag.textContent = "Defeat";
+  questionText.textContent = "The keep fell. Good. Failure state means the level has teeth.";
+
+  answersBox.innerHTML = `
+    <div class="summary-grid">
+      <div class="summary-box">
+        <span class="label">Accuracy</span>
+        <span class="value">${accuracy}%</span>
+      </div>
+      <div class="summary-box">
+        <span class="label">Gate Left</span>
+        <span class="value">0 / ${state.maxGateHealth}</span>
+      </div>
+      <div class="summary-box">
+        <span class="label">Level</span>
+        <span class="value">${state.currentLevel.id}</span>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="primary" onclick="replayCurrentLevel()">Try Again</button>
+      <button class="secondary" onclick="showLevelMap()">Level Map</button>
+    </div>
+  `;
+
+  resultBox.className = "resultbox bad";
+  resultBox.textContent = "No stars. No mercy. Try again.";
+  logMessage(`${state.currentLevel.name} failed.`, "bad");
+  updateStats();
+}
+
+function replayCurrentLevel() {
+  questionOverlay.classList.remove("active");
+  state.questionOpen = false;
+  logBox.innerHTML = "";
+  startLevel(state.currentLevelIndex);
+}
+
+function startNextLevel() {
+  questionOverlay.classList.remove("active");
+  state.questionOpen = false;
+  logBox.innerHTML = "";
+  startLevel(state.currentLevelIndex + 1);
+}
+
+function resetCampaign() {
+  campaign.unlockedLevel = 1;
+  campaign.bestStars = {};
+  logBox.innerHTML = "";
+  resetLevelState();
+  loadLevel(0);
+  showLevelMap();
+  logMessage("Campaign reset. Back to level one. As it should be.", "note");
 }
 
 function gameLoop(timestamp) {
@@ -957,8 +1251,20 @@ function gameLoop(timestamp) {
   requestAnimationFrame(gameLoop);
 }
 
-updateStats();
-logMessage("Prototype ready. Hit Start Prototype and see if the loop has teeth.", "note");
+/* =========================================================
+   GLOBAL BUTTON HOOKS FOR INLINE HTML BUTTONS
+   ========================================================= */
+window.startFromMap = startFromMap;
+window.replayCurrentLevel = replayCurrentLevel;
+window.startNextLevel = startNextLevel;
+window.showLevelMap = showLevelMap;
+
+/* =========================================================
+   INITIALIZE
+   ========================================================= */
+loadLevel(0);
+showLevelMap();
+logMessage("Campaign ready. Pick a level and defend the chapter.", "note");
 </script>
 </body>
 </html>
