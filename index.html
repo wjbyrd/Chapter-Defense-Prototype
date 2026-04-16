@@ -735,7 +735,7 @@ const ENEMY_TYPES = {
   sprinter: {
     label: "Sprinter",
     hp: 5,
-    speedMult: 2,
+    speedMult: 1.5,
     gold: 1,
     breachDps: 1.1,
     size: 30,
@@ -755,9 +755,9 @@ const ENEMY_TYPES = {
 };
 
 const BASE_TOWERS = [
-  { key: "single", name: "Preference Tower", x: 212, y: 245, baseDamage: 0.5, bonusVsTank: 1, fireCooldown: 2500, upgradeType: "Tank damage", upgradeCostBase: 14 },
-  { key: "aoe", name: "Budget Tower", x: 372, y: 245, baseDamage: 0.5, splashRadius: 50, fireCooldown: 3000, upgradeType: "Splash damage", upgradeCostBase: 14 },
-  { key: "slow", name: "Utility Tower", x: 532, y: 245, baseDamage: 0, slowAmount: 0.15, slowDuration: 1000, fireCooldown: 1600, upgradeType: "Slow strength", upgradeCostBase: 14 }
+  { key: "single", name: "Preference Tower", x: 212, y: 245, baseDamage: 1, bonusVsTank: 1, fireCooldown: 2000, upgradeType: "Tank damage", upgradeCostBase: 14 },
+  { key: "aoe", name: "Budget Tower", x: 372, y: 245, baseDamage: 1, splashRadius: 50, fireCooldown: 2400, upgradeType: "Splash damage", upgradeCostBase: 14 },
+  { key: "slow", name: "Utility Tower", x: 532, y: 245, baseDamage: 0, slowAmount: 0.15, slowDuration: 1000, fireCooldown: 1400, upgradeType: "Slow strength", upgradeCostBase: 14 }
 ];
 
 const LEVELS = [
@@ -919,7 +919,8 @@ let state = {
     slow: 0
   },
   awaitingWaveQuestion: false,
-  awaitingWaveUpgradeChoice: false
+  awaitingWaveUpgradeChoice: false,
+  killsSinceLastQuestion: 0
 };
 
 const lane = document.getElementById("lane");
@@ -1082,6 +1083,7 @@ function resetLevelState() {
   state.awaitingWaveQuestion = false;
   state.awaitingWaveUpgradeChoice = false;
   state.autoFireTimers = { single: 0, aoe: 0, slow: 0 };
+  state.killsSinceLastQuestion = 0;
   questionOverlay.classList.remove("active");
   resultBox.className = "resultbox";
   resultBox.textContent = "";
@@ -1247,10 +1249,16 @@ function askUpgradeQuestion(onSuccess, onFailure, titleText = "Upgrade Question"
     answersBox.appendChild(btn);
   });
 }
-
+  
 function showWaveQuestionGate() {
   if (state.awaitingWaveQuestion || state.awaitingWaveUpgradeChoice || state.gameOver) return;
+
   state.awaitingWaveQuestion = true;
+
+  const title = state.enemies.length === 0
+    ? `Wave ${state.waveIndex + 1} Upgrade Gate`
+    : `Mid-Wave Upgrade Gate`;
+
   askUpgradeQuestion(
     () => {
       state.awaitingWaveQuestion = false;
@@ -1258,10 +1266,10 @@ function showWaveQuestionGate() {
     },
     () => {
       state.awaitingWaveQuestion = false;
-      logMessage("Missed the upgrade question. Next wave starts without a shop.", "bad");
+      logMessage("Missed the upgrade question. No shop unlocked.", "bad");
       startNextWave();
     },
-    `Wave ${state.waveIndex + 1} Upgrade Gate`
+    title
   );
 }
 
@@ -1559,17 +1567,32 @@ function destroyEnemy(enemy) {
   if (enemy.element) enemy.element.remove();
   if (enemy.slowTimeout) clearTimeout(enemy.slowTimeout);
   state.enemies = state.enemies.filter(e => e.id !== enemy.id);
-  addGold(enemy.gold);
-  logMessage(`${ENEMY_TYPES[enemy.typeKey].label} destroyed. +${enemy.gold} gold.`, "good");
-  updateStats();
+addGold(enemy.gold);
+logMessage(`${ENEMY_TYPES[enemy.typeKey].label} destroyed. +${enemy.gold} gold.`, "good");
 
-  const waveEntries = getCurrentWaveEntries();
-  const finishedFinalWave =
-    state.waveIndex === state.currentLevel.waves.length - 1 &&
-    state.enemies.length === 0 &&
-    state.enemiesSpawnedInWave >= waveEntries.length;
+state.killsSinceLastQuestion++;
 
-  if (finishedFinalWave) completeLevel();
+if (
+  state.killsSinceLastQuestion >= 5 &&
+  !state.awaitingWaveQuestion &&
+  !state.awaitingWaveUpgradeChoice &&
+  !state.questionOpen &&
+  !state.gameOver
+) {
+  state.killsSinceLastQuestion = 0;
+  showWaveQuestionGate();
+  return;
+}
+
+updateStats();
+
+const waveEntries = getCurrentWaveEntries();
+const finishedFinalWave =
+  state.waveIndex === state.currentLevel.waves.length - 1 &&
+  state.enemies.length === 0 &&
+  state.enemiesSpawnedInWave >= waveEntries.length;
+
+if (finishedFinalWave) completeLevel();
 }
 
 function advanceEnemies(delta) {
