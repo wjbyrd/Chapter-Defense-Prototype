@@ -944,18 +944,6 @@ const QUESTIONS = [
   }
 ];
 
-const campaign = {
-  unlockedLevel: 1,
-  bestStars: {},
-  gold: 0,
-  towerLevels: {
-    single: 1,
-    aoe: 1,
-    slow: 1
-  },
-  conceptMemory: {}
-};
-
 let state = {
   running: false,
   paused: false,
@@ -977,10 +965,7 @@ let state = {
   tagHistory: [],
   askedQuestionIds: [],
   askedTagsThisLevel: {},
-  autoFireTimers: {
-    single: 0,
-    aoe: 0,
-    slow: 0
+  autoFireTimers: {}
   },
   awaitingWaveQuestion: false,
   awaitingWaveUpgradeChoice: false,
@@ -1433,6 +1418,48 @@ function getCurrentWave() {
 function getCurrentWaveEntries() {
   return getCurrentWave().entries;
 }
+
+function getCurrentWorldLayout() {
+  return WORLD_LAYOUTS[1];
+}
+
+function getSlotById(slotId) {
+  return getCurrentWorldLayout().slots.find(slot => slot.id === slotId);
+}
+
+function getTowerStats(tower) {
+  const base = TOWER_TYPES[tower.type];
+  const level = tower.level || 1;
+
+  if (tower.type === "single") {
+    return {
+      ...base,
+      level,
+      damage: base.baseDamage + ((level - 1) * 0.5),
+      bonusVsTank: base.bonusVsTank + ((level - 1) * 0.5),
+      fireCooldown: Math.max(500, base.fireCooldown - ((level - 1) * 50))
+    };
+  }
+
+  if (tower.type === "aoe") {
+    return {
+      ...base,
+      level,
+      damage: base.baseDamage + ((level - 1) * 0.75),
+      splashRadius: base.splashRadius + ((level - 1) * 8),
+      fireCooldown: Math.max(700, base.fireCooldown - ((level - 1) * 40))
+    };
+  }
+
+  return {
+    ...base,
+    level,
+    damage: base.baseDamage,
+    slowAmount: Math.min(0.5, base.slowAmount + ((level - 1) * 0.05)),
+    slowDuration: base.slowDuration + ((level - 1) * 300),
+    fireCooldown: Math.max(500, base.fireCooldown - ((level - 1) * 40))
+  };
+}
   
 function getTowerTarget(tower) {
   const slot = getSlotById(tower.slotId);
@@ -1461,44 +1488,51 @@ function getTowerTarget(tower) {
 }
 
 function updateAutoFire(delta) {
-  const towers = getTowerDefinitions();
-  towers.forEach(tower => {
-    state.autoFireTimers[tower.role] += delta;
-    if (state.autoFireTimers[tower.role] < tower.fireCooldown) return;
+  campaign.towers.forEach(tower => {
+    if (!state.autoFireTimers[tower.id]) state.autoFireTimers[tower.id] = 0;
+
+    const stats = getTowerStats(tower);
+    state.autoFireTimers[tower.id] += delta;
+
+    if (state.autoFireTimers[tower.id] < stats.fireCooldown) return;
 
     const target = getTowerTarget(tower);
     if (!target) return;
 
-    state.autoFireTimers[tower.role] = 0;
-    animateTowerCharge(tower.role);
+    const slot = getSlotById(tower.slotId);
+    if (!slot) return;
 
-    if (tower.role === "single") {
-      spawnProjectile(tower, target, tower.damage, tower.bonusVsTank || 0, 0, 0, 0);
-    } else if (tower.role === "aoe") {
-      spawnProjectile(tower, target, tower.damage, 0, tower.splashRadius || 0, 0, 0);
+    state.autoFireTimers[tower.id] = 0;
+
+    if (tower.type === "single") {
+      spawnProjectile(slot, tower, target, stats.damage, stats.bonusVsTank || 0, 0, 0, 0);
+    } else if (tower.type === "aoe") {
+      spawnProjectile(slot, tower, target, stats.damage, 0, stats.splashRadius || 0, 0, 0);
     } else {
-      spawnProjectile(tower, target, tower.damage, 0, 0, tower.slowAmount || 0, tower.slowDuration || 0);
+      spawnProjectile(slot, tower, target, stats.damage, 0, 0, stats.slowAmount || 0, stats.slowDuration || 0);
     }
   });
 }
 
-function spawnProjectile(tower, target, damage, bonusVsTank = 0, splashRadius = 0, slowAmount = 0, slowDuration = 0) {
+function spawnProjectile(slot, tower, target, damage, bonusVsTank = 0, splashRadius = 0, slowAmount = 0, slowDuration = 0) {
   const proj = document.createElement("div");
   proj.className = "projectile";
-  proj.style.left = `${tower.x}px`;
-  proj.style.top = `${tower.y}px`;
-  if (tower.role === "aoe") proj.style.background = "#93c5fd";
-  if (tower.role === "slow") proj.style.background = "#a78bfa";
+  proj.style.left = `${slot.x}px`;
+  proj.style.top = `${slot.y}px`;
+
+  if (tower.type === "aoe") proj.style.background = "#93c5fd";
+  if (tower.type === "slow") proj.style.background = "#a78bfa";
+
   lane.appendChild(proj);
 
   state.projectiles.push({
-    x: tower.x,
-    y: tower.y,
+    x: slot.x,
+    y: slot.y,
     speed: state.currentLevel.projectileSpeed,
     targetId: target.id,
     damage,
     element: proj,
-    role: tower.role,
+    role: tower.type,
     bonusVsTank,
     splashRadius,
     slowAmount,
