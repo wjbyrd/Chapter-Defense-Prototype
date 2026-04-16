@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Chapter Defense Prototype - Upgrades</title>
+<title>Chapter Defense Prototype - Adaptive Tags</title>
 <style>
   :root{
     --bg:#111827;
@@ -275,7 +275,6 @@
   button:hover{ filter:brightness(.95); }
   button.primary{ background:var(--accent); }
   button.secondary{ background:#cbd5e1; }
-  button.danger{ background:#fca5a5; }
   button:disabled{
     opacity:.5;
     cursor:not-allowed;
@@ -306,21 +305,25 @@
     inset:0;
     background:rgba(2,6,23,.82);
     display:none;
-    align-items:center;
+    align-items:flex-start;
     justify-content:center;
     padding:20px;
     z-index:30;
+    overflow:auto;
   }
 
   .overlay.active{ display:flex; }
 
   .question-card{
     width:min(820px, 95%);
+    max-height:calc(100vh - 120px);
+    overflow:auto;
     background:#0f172a;
     border:1px solid #334155;
     border-radius:18px;
     padding:22px;
     box-shadow:0 0 30px rgba(0,0,0,.35);
+    margin-top:10px;
   }
 
   .question-card h3{
@@ -532,6 +535,7 @@
     .tower.t3{ left:260px; }
     .gate{ width:72px; }
     .summary-grid{ grid-template-columns:1fr; }
+    .question-card{ max-height:calc(100vh - 80px); }
   }
 </style>
 </head>
@@ -541,7 +545,7 @@
   <div class="topbar">
     <div class="titlebox">
       <h1 id="chapterHeading">Consumer Choice Defense</h1>
-      <p id="levelHeading">Defend the chapter. Beat levels. Earn stars. Choose upgrades.</p>
+      <p id="levelHeading">Defend the chapter. Beat levels. Earn stars. Adapt or die.</p>
     </div>
 
     <div class="stats">
@@ -581,7 +585,7 @@
       <div class="question-card">
         <h3 id="questionTitle">Consumer Choice Defense</h3>
         <div class="tag" id="questionTag">Prototype Campaign</div>
-        <div class="qtext" id="questionText">Start the chapter and see if this thing can carry a progression loop.</div>
+        <div class="qtext" id="questionText">Start the chapter and let the weak-tag engine do its thing.</div>
         <div class="answers" id="answersBox"></div>
         <div class="resultbox" id="resultBox"></div>
       </div>
@@ -596,8 +600,8 @@
 
     <div class="panel">
       <h2>What Changed</h2>
-      <p>This build fixes the rushed feedback window, fixes the duplicate final button garbage, and adds simple between-level upgrades that carry through the chapter.</p>
-      <p>You beat a level, you pick one reward, and the next level reflects that choice. Nice and clean.</p>
+      <p>This build fixes the clipped overlay, removes the useless question number title spam, clarifies gate bonuses, and adds weak-tag adaptation.</p>
+      <p>Miss a concept and the game leans on it harder. Boss phase starts hunting your weakest category first.</p>
       <div class="controls">
         <button class="primary" id="openMapBtn">Open Level Map</button>
         <button class="secondary" id="resetCampaignBtn">Reset Campaign</button>
@@ -608,19 +612,15 @@
 </div>
 
 <script>
-/* =========================================================
-   SAFE TO EDIT: CHAPTER / CAMPAIGN STRUCTURE
-   ========================================================= */
 const CHAPTER = {
   title: "Consumer Choice Defense",
   subtitle: "Hold the line across three prototype levels."
 };
 
 const FEEDBACK_DELAY_MS = 1800;
+const RECENT_TAG_WINDOW = 4;
+const MAX_TAG_WEIGHT_BONUS = 4;
 
-/* =========================================================
-   SAFE TO EDIT: LEVEL DEFINITIONS
-   ========================================================= */
 const LEVELS = [
   {
     id: 1,
@@ -669,9 +669,6 @@ const LEVELS = [
   }
 ];
 
-/* =========================================================
-   SAFE TO EDIT: BETWEEN-LEVEL UPGRADES
-   ========================================================= */
 const UPGRADE_OPTIONS = [
   {
     id: "gate",
@@ -699,63 +696,81 @@ const UPGRADE_OPTIONS = [
   }
 ];
 
-/* =========================================================
-   SAFE TO EDIT: QUESTION BANK
-   ========================================================= */
 const QUESTIONS = [
   {
+    id: 1,
     tag: "Preferences",
-    title: "Question 1",
     text: "If a consumer prefers bundle A to bundle B, and bundle B to bundle C, then consistent preferences imply the consumer should prefer:",
     answers: ["C to A", "A to C", "Only B to C", "None of the above"],
     correct: 1,
     feedback: "That’s transitivity. If preferences are consistent, A beats C too."
   },
   {
+    id: 2,
     tag: "Budget Constraint",
-    title: "Question 2",
     text: "When the price of one good rises and income stays the same, the consumer’s budget constraint usually:",
     answers: ["Shifts outward", "Does not change", "Rotates inward", "Becomes flatter for all goods"],
     correct: 2,
-    feedback: "Right. A price change for one good rotates the budget line inward around the other intercept."
+    feedback: "A price change for one good rotates the budget line inward around the other intercept."
   },
   {
+    id: 3,
     tag: "Utility Maximization",
-    title: "Question 3",
     text: "At the consumer optimum, the decision rule is best described as:",
     answers: ["Buy only the cheaper good", "Equal total utility across goods", "Equal marginal utility per dollar across goods", "Spend half of income on each good"],
     correct: 2,
-    feedback: "That’s the core rule. Consumers equalize marginal utility per dollar when possible."
+    feedback: "Consumers equalize marginal utility per dollar when possible."
   },
   {
+    id: 4,
     tag: "Preferences",
-    title: "Question 4",
     text: "Indifference curves that cross each other would suggest:",
     answers: ["Consistent preferences", "Higher income", "A violation of rational preference ordering", "Perfect competition"],
     correct: 2,
     feedback: "Crossing curves wreck consistent ranking."
   },
   {
+    id: 5,
     tag: "Budget Constraint",
-    title: "Question 5",
     text: "An increase in income, holding prices fixed, causes the budget constraint to:",
     answers: ["Shift outward in a parallel way", "Rotate inward", "Rotate outward around one intercept", "Disappear"],
     correct: 0,
     feedback: "Same slope. Bigger opportunity set."
   },
   {
+    id: 6,
     tag: "Utility Maximization",
-    title: "Question 6",
     text: "If a consumer is not maximizing utility, the most likely issue is that:",
     answers: ["The last dollar spent on each good gives different marginal utility", "All goods have the same price", "Income is zero", "Preferences are complete"],
     correct: 0,
-    feedback: "Exactly. Reallocate spending until marginal utility per dollar lines up."
+    feedback: "Reallocate spending until marginal utility per dollar lines up."
+  },
+  {
+    id: 7,
+    tag: "Preferences",
+    text: "If preferences are complete, that means the consumer can:",
+    answers: ["Always maximize income", "Rank any two bundles", "Only compare affordable bundles", "Ignore opportunity cost"],
+    correct: 1,
+    feedback: "Completeness means any two bundles can be ranked."
+  },
+  {
+    id: 8,
+    tag: "Budget Constraint",
+    text: "The slope of the budget line reflects:",
+    answers: ["Income divided by utility", "The tradeoff between the two goods based on prices", "Only the price of the x-axis good", "Consumer happiness"],
+    correct: 1,
+    feedback: "The slope captures the market tradeoff implied by relative prices."
+  },
+  {
+    id: 9,
+    tag: "Utility Maximization",
+    text: "If MUx/Px is greater than MUy/Py, the consumer should usually:",
+    answers: ["Buy more of y and less of x", "Buy more of x and less of y", "Stop consuming both goods", "Raise income"],
+    correct: 1,
+    feedback: "The consumer should shift spending toward x until the ratios line up."
   }
 ];
 
-/* =========================================================
-   CAMPAIGN STATE
-   ========================================================= */
 const campaign = {
   unlockedLevel: 1,
   bestStars: {},
@@ -786,7 +801,11 @@ let state = {
   questionOpen: false,
   currentLevelIndex: 0,
   currentLevel: null,
-  awaitingUpgradeChoice: false
+  awaitingUpgradeChoice: false,
+  conceptMemory: {},
+  tagHistory: [],
+  askedQuestionIds: [],
+  pendingQuestion: null
 };
 
 const lane = document.getElementById("lane");
@@ -892,6 +911,9 @@ function resetLevelState() {
   state.enemiesSpawnedInWave = 0;
   state.questionOpen = false;
   state.awaitingUpgradeChoice = false;
+  state.tagHistory = [];
+  state.askedQuestionIds = [];
+  state.pendingQuestion = null;
   questionOverlay.classList.remove("active");
   resultBox.className = "resultbox";
   resultBox.textContent = "";
@@ -937,6 +959,19 @@ function startLevel(levelIndex) {
   requestAnimationFrame(gameLoop);
 }
 
+function getTagBreakdownHTML() {
+  const tags = Object.keys(state.conceptMemory);
+  if (!tags.length) {
+    return `<div style="color:#94a3b8;">No weak-tag pressure yet.</div>`;
+  }
+  const sorted = [...tags].sort((a,b) => (state.conceptMemory[b] || 0) - (state.conceptMemory[a] || 0));
+  return `
+    <div class="pill-list">
+      ${sorted.map(tag => `<span class="pill">${tag}: ${state.conceptMemory[tag]}</span>`).join("")}
+    </div>
+  `;
+}
+
 function showLevelMap() {
   state.running = false;
   state.paused = true;
@@ -951,13 +986,17 @@ function showLevelMap() {
     const unlocked = level.id <= campaign.unlockedLevel;
     const stars = campaign.bestStars[level.id] || 0;
     const modifiedLevel = getLevelWithRunModifiers(level);
+    const gateBonusText = campaign.upgrades.gateBonus > 0
+      ? `${level.gateHealth} + ${campaign.upgrades.gateBonus} = ${modifiedLevel.gateHealth}`
+      : `${level.gateHealth}`;
+    const damageText = `${1 + campaign.upgrades.damageBonus}`;
     return `
       <div class="level-row ${unlocked ? "" : "locked"}">
         <div>
           <div><strong>${level.name}</strong></div>
           <div style="color:#94a3b8; font-size:.9rem; margin-top:4px;">${level.description}</div>
           <div style="color:#cbd5e1; font-size:.86rem; margin-top:6px;">
-            Gate ${modifiedLevel.gateHealth} | Enemy Speed ${modifiedLevel.enemySpeed.toFixed(2)} | Damage ${1 + campaign.upgrades.damageBonus}
+            Gate ${gateBonusText} | Enemy Speed ${modifiedLevel.enemySpeed.toFixed(2)} | Damage ${damageText}
           </div>
         </div>
         <div style="display:flex; align-items:center; gap:12px;">
@@ -973,6 +1012,10 @@ function showLevelMap() {
   answersBox.innerHTML = `
     <div class="level-list">${rows}</div>
     ${renderActiveUpgradesHTML()}
+    <div class="active-upgrades">
+      <strong>Weak-Tag Pressure</strong>
+      ${getTagBreakdownHTML()}
+    </div>
   `;
   resultBox.className = "resultbox";
   resultBox.textContent = "";
@@ -985,13 +1028,71 @@ function startFromMap(levelIndex) {
   startLevel(levelIndex);
 }
 
+function recordTagHistory(tag) {
+  state.tagHistory.push(tag);
+  if (state.tagHistory.length > RECENT_TAG_WINDOW) state.tagHistory.shift();
+}
+
+function getWeakestTag() {
+  const entries = Object.entries(state.conceptMemory);
+  if (!entries.length) return null;
+  entries.sort((a,b) => b[1] - a[1]);
+  return entries[0][0];
+}
+
+function weightedPick(pool) {
+  if (!pool.length) return null;
+  const weighted = [];
+
+  pool.forEach(q => {
+    let weight = 1;
+    const weakness = state.conceptMemory[q.tag] || 0;
+    weight += Math.min(MAX_TAG_WEIGHT_BONUS, weakness);
+
+    if (!state.tagHistory.includes(q.tag)) {
+      weight += 1;
+    }
+
+    if (state.askedQuestionIds.slice(-4).includes(q.id)) {
+      weight = Math.max(1, weight - 2);
+    }
+
+    for (let i = 0; i < weight; i++) weighted.push(q);
+  });
+
+  return weighted[Math.floor(Math.random() * weighted.length)];
+}
+
+function pickAdaptiveQuestion() {
+  const wave = state.currentLevel.waves[state.waveIndex];
+  const isBossWave = !!wave.boss;
+  const weakestTag = getWeakestTag();
+
+  let pool = QUESTIONS.filter(q => !state.askedQuestionIds.slice(-5).includes(q.id));
+  if (!pool.length) pool = [...QUESTIONS];
+
+  if (isBossWave && weakestTag) {
+    const targeted = pool.filter(q => q.tag === weakestTag);
+    if (targeted.length) {
+      logMessage(`Boss targeting weakest tag: ${weakestTag}.`, "bad");
+      return weightedPick(targeted);
+    }
+  }
+
+  return weightedPick(pool);
+}
+
 function openQuestion() {
   if (state.questionOpen || state.gameOver || !state.currentLevel) return;
   state.paused = true;
   state.questionOpen = true;
 
-  const q = QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
-  questionTitle.textContent = q.title;
+  const q = pickAdaptiveQuestion();
+  state.pendingQuestion = q;
+  state.askedQuestionIds.push(q.id);
+  recordTagHistory(q.tag);
+
+  questionTitle.textContent = "Question";
   questionTag.textContent = q.tag;
   questionText.textContent = q.text;
   answersBox.innerHTML = "";
@@ -1019,15 +1120,17 @@ function handleAnswer(question, selectedIndex) {
 
   if (correct) {
     state.totalCorrect++;
+    state.conceptMemory[question.tag] = Math.max(0, (state.conceptMemory[question.tag] || 0) - 1);
     resultBox.className = "resultbox good";
     resultBox.textContent = "Correct. Towers fire. " + question.feedback;
     logMessage(`Correct: ${question.tag} powers the defenses.`, "good");
     fireTowerVolley();
   } else {
+    state.conceptMemory[question.tag] = (state.conceptMemory[question.tag] || 0) + 1;
     resultBox.className = "resultbox bad";
     resultBox.textContent = "Wrong. The gate takes damage. " + question.feedback;
     state.gateHealth -= 1;
-    logMessage(`Wrong: ${question.tag} error. Gate takes 1 damage.`, "bad");
+    logMessage(`Wrong: ${question.tag} error. Weak-tag pressure rises. Gate takes 1 damage.`, "bad");
     if (state.gateHealth <= 0) {
       state.gateHealth = 0;
       updateStats();
@@ -1239,10 +1342,8 @@ function calculateStars() {
   const accuracy = getCurrentAccuracy();
   const gateRatio = state.maxGateHealth ? state.gateHealth / state.maxGateHealth : 0;
   let stars = 1;
-
   if (accuracy >= 70) stars = 2;
   if (accuracy >= 85 && gateRatio >= 0.6) stars = 3;
-
   return { stars, accuracy, gateRatio };
 }
 
@@ -1268,7 +1369,7 @@ function showUpgradeChoice(nextLevelExists) {
   questionTag.textContent = "Between-Level Upgrade";
   questionText.textContent = nextLevelExists
     ? "You cleared the level. Pick one upgrade for the rest of this run before moving on."
-    : "You cleared the chapter. You can still inspect or replay, but there’s no next level to juice up.";
+    : "You cleared the chapter. No next level remains, so just replay or return to the map.";
 
   if (!nextLevelExists) {
     answersBox.innerHTML = `
@@ -1278,7 +1379,7 @@ function showUpgradeChoice(nextLevelExists) {
       </div>
     `;
     resultBox.className = "resultbox good";
-    resultBox.textContent = "Chapter cleared. No duplicate button clown show this time.";
+    resultBox.textContent = "Chapter cleared. Clean ending. No duplicate button nonsense.";
     return;
   }
 
@@ -1344,8 +1445,8 @@ function completeLevel() {
   questionTitle.textContent = `${state.currentLevel.name} Cleared`;
   questionTag.textContent = finalLevel ? "Campaign Victory" : "Level Complete";
   questionText.textContent = finalLevel
-    ? "You cleared the final prototype level. Good. Now this thing has a real campaign spine."
-    : "Level complete. You survived the siege and earned a rating. That’s progression.";
+    ? "You cleared the final prototype level. Good. Now the campaign has structure and adaptation."
+    : "Level complete. You survived the siege and earned a rating.";
 
   answersBox.innerHTML = `
     <div class="stars">${renderStars(result.stars)}</div>
@@ -1377,7 +1478,7 @@ function completeLevel() {
     ? "Three stars. That level got stomped."
     : result.stars === 2
       ? "Two stars. Solid, but not domination."
-      : "One star. You survived. Barely. Run it back.";
+      : "One star. You survived. Barely.";
 
   logMessage(`${state.currentLevel.name} completed with ${result.stars} star(s).`, "good");
   updateStats();
@@ -1470,11 +1571,12 @@ function resetCampaign() {
     slowFactor: 0
   };
   campaign.chosenUpgrades = [];
+  state.conceptMemory = {};
   logBox.innerHTML = "";
   resetLevelState();
   loadLevel(0);
   showLevelMap();
-  logMessage("Campaign reset. Upgrades wiped. Back to level one.", "note");
+  logMessage("Campaign reset. Upgrades wiped. Weak-tag memory wiped. Back to level one.", "note");
 }
 
 function gameLoop(timestamp) {
@@ -1494,9 +1596,6 @@ function gameLoop(timestamp) {
   requestAnimationFrame(gameLoop);
 }
 
-/* =========================================================
-   GLOBAL BUTTON HOOKS
-   ========================================================= */
 window.startFromMap = startFromMap;
 window.replayCurrentLevel = replayCurrentLevel;
 window.startNextLevel = startNextLevel;
@@ -1504,9 +1603,6 @@ window.showLevelMap = showLevelMap;
 window.chooseUpgrade = chooseUpgrade;
 window.proceedAfterVictory = proceedAfterVictory;
 
-/* =========================================================
-   INITIALIZE
-   ========================================================= */
 loadLevel(0);
 showLevelMap();
 logMessage("Campaign ready. Pick a level and defend the chapter.", "note");
