@@ -87,6 +87,26 @@
     font-weight:bold;
   }
 
+.slot-marker{
+  position:absolute;
+  bottom:86px;
+  width:64px;
+  height:110px;
+  border:2px dashed rgba(203,213,225,.45);
+  border-radius:10px 10px 0 0;
+  background:rgba(148,163,184,.06);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#cbd5e1;
+  font-weight:bold;
+  pointer-events:none;
+}
+
+.slot-marker.filled{
+  opacity:.25;
+}
+
   .battlefield{
     position:relative;
     background:linear-gradient(180deg,#334155 0%, #475569 18%, #3f5d34 18%, #35572d 100%);
@@ -1047,6 +1067,23 @@ function resetLevelState() {
   renderPlacedTowers();
 }
 
+function renderSlotMarkers() {
+  document.querySelectorAll(".slot-marker").forEach(el => el.remove());
+
+  getCurrentWorldLayout().slots.forEach(slot => {
+    const marker = document.createElement("div");
+    marker.className = "slot-marker";
+    marker.style.left = `${slot.x - 32}px`;
+    marker.textContent = `${slot.id + 1}`;
+
+    if (getPlacedTowerInSlot(slot.id)) {
+      marker.classList.add("filled");
+    }
+
+    lane.appendChild(marker);
+  });
+}
+  
 function renderPlacedTowers() {
   document.querySelectorAll(".placed-tower").forEach(el => el.remove());
 
@@ -1061,10 +1098,13 @@ function renderPlacedTowers() {
     towerEl.innerHTML = `
       <div class="tower-name">${TOWER_TYPES[tower.type].name.replace(" Tower", "")}</div>
       <div class="charge"><div class="charge-fill"></div></div>
+      <div class="tower-level">L${tower.level}</div>
     `;
 
     lane.appendChild(towerEl);
   });
+
+  renderSlotMarkers();
 }
   
 function getPlacedTowerInSlot(slotId) {
@@ -1277,14 +1317,54 @@ function showWaveQuestionGate() {
 }
 
 function renderWaveShopHTML() {
+  const upgradeCards = campaign.towers.map(tower => {
+    const cost = getTowerUpgradeCost(tower);
+    const slotLabel = `Slot ${tower.slotId + 1}`;
+    return `
+      <div class="shop-card">
+        <h5>${TOWER_TYPES[tower.type].name}</h5>
+        <p>${slotLabel} • Level ${tower.level}</p>
+        <div class="shop-meta">Upgrade Cost: ${cost} gold</div>
+        <button
+          class="${campaign.gold >= cost ? "primary" : "secondary"}"
+          ${campaign.gold >= cost ? "" : "disabled"}
+          onclick="upgradeTower(${tower.id})"
+        >
+          Upgrade
+        </button>
+      </div>
+    `;
+  }).join("");
+
+  const buildCards = getOpenSlots().length ? Object.values(TOWER_TYPES).map(tower => `
+    <div class="shop-card">
+      <h5>Build ${tower.name}</h5>
+      <p>Adds a new tower in the next open slot.</p>
+      <div class="shop-meta">Build Cost: ${tower.buildCost} gold</div>
+      <button
+        class="${campaign.gold >= tower.buildCost ? "primary" : "secondary"}"
+        ${campaign.gold >= tower.buildCost ? "" : "disabled"}
+        onclick="buildTowerInFirstOpenSlot('${tower.key}')"
+      >
+        Build
+      </button>
+    </div>
+  `).join("") : `<p style="color:#94a3b8;">All slots filled. No new tower can be built.</p>`;
+
   return `
     <div class="wave-shop">
       <h4>Spend Gold Before the Next Wave</h4>
       <div class="gold-line">Current Gold: ${campaign.gold}</div>
-      <p style="color:#cbd5e1; margin:0;">
-        Tower building and per-tower upgrades are being rewired for the new slot-based system.
-        The old fixed-role upgrade shop has been removed.
-      </p>
+
+      <div class="active-upgrades">
+        <strong>Upgrade Existing Towers</strong>
+        <div class="shop-grid">${upgradeCards || `<p style="color:#94a3b8;">No towers placed.</p>`}</div>
+      </div>
+
+      <div class="active-upgrades">
+        <strong>Build New Tower</strong>
+        <div class="shop-grid">${buildCards}</div>
+      </div>
     </div>
   `;
 }
@@ -1809,10 +1889,14 @@ function showTowerGuide() {
       ${getTagBreakdownHTML()}
     </div>
     ${getChapterPersistenceHTML()}
-    <div class="controls">
-      <button class="primary" onclick="showLevelMap()">Level Map</button>
-      <button class="secondary" onclick="closeOverlayResume()">Return</button>
-    </div>
+  <div class="controls">
+    <button class="primary" onclick="showLevelMap()">Level Map</button>
+    ${
+      state.awaitingWaveUpgradeChoice
+        ? `<button class="secondary" onclick="showWaveUpgradeChoice()">Return to Shop</button>`
+        : `<button class="secondary" onclick="closeOverlayResume()">Return</button>`
+      }
+  </div>
   `;
   resultBox.className = "resultbox good";
   resultBox.textContent = "This is now a real tower-defense loop. The questions gate growth, not the guns.";
@@ -1833,6 +1917,32 @@ function closeOverlayResume() {
   }
 }
 
+function getTowerUpgradeCost(tower) {
+  const base = TOWER_TYPES[tower.type].upgradeCostBase;
+  return base + ((tower.level - 1) * 4);
+}
+
+function upgradeTower(towerId) {
+  const tower = campaign.towers.find(t => t.id === towerId);
+  if (!tower) return;
+  const cost = getTowerUpgradeCost(tower);
+  if (campaign.gold < cost) return;
+
+  campaign.gold -= cost;
+  tower.level += 1;
+  updateStats();
+  renderPlacedTowers();
+  showWaveUpgradeChoice();
+}
+
+function buildTowerInFirstOpenSlot(type) {
+  const openSlots = getOpenSlots();
+  if (!openSlots.length) return;
+  const built = buildTower(type, openSlots[0].id);
+  if (!built) return;
+  showWaveUpgradeChoice();
+}
+  
 function showLevelMap() {
   const canResumeRun =
     state.currentLevel &&
@@ -2254,6 +2364,8 @@ window.selectBuildType = selectBuildType;
 window.placeStarterTower = placeStarterTower;
 window.beginBattleAfterSetup = beginBattleAfterSetup;
 window.buyMetaUpgrade = buyMetaUpgrade;
+window.upgradeTower = upgradeTower;
+window.buildTowerInFirstOpenSlot = buildTowerInFirstOpenSlot;
 
 loadLevel(0);
 showLevelMap();
