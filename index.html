@@ -724,9 +724,9 @@ const COVERAGE_BOOST = 3;
 const ENEMY_TYPES = {
   grunt: {
     label: "Grunt",
-    hp: 3,
+    hp: 6,
     speedMult: 1.0,
-    gold: 1,
+    gold: 0.5,
     breachDps: 0.8,
     size: 40,
     fill: "radial-gradient(circle at 30% 30%, #fca5a5, #b91c1c 65%)",
@@ -734,30 +734,30 @@ const ENEMY_TYPES = {
   },
   sprinter: {
     label: "Sprinter",
-    hp: 2,
-    speedMult: 1.8,
+    hp: 5,
+    speedMult: 2,
     gold: 1,
     breachDps: 1.1,
-    size: 34,
+    size: 30,
     fill: "radial-gradient(circle at 30% 30%, #93c5fd, #1d4ed8 68%)",
     border: "#1e3a8a"
   },
   tank: {
     label: "Tank",
-    hp: 8,
+    hp: 18,
     speedMult: 0.7,
     gold: 2,
     breachDps: 2.4,
-    size: 56,
+    size: 60,
     fill: "radial-gradient(circle at 30% 30%, #fde68a, #b45309 70%)",
     border: "#92400e"
   }
 };
 
 const BASE_TOWERS = [
-  { key: "single", name: "Preference Tower", x: 212, y: 245, baseDamage: 3, bonusVsBoss: 2, cooldown: 1400, upgradeType: "Boss damage", upgradeCostBase: 14 },
-  { key: "aoe", name: "Budget Tower", x: 372, y: 245, baseDamage: 1, splashRadius: 70, cooldown: 1800, upgradeType: "Splash damage", upgradeCostBase: 14 },
-  { key: "slow", name: "Utility Tower", x: 532, y: 245, baseDamage: 0, slowAmount: 0.18, slowDuration: 2200, cooldown: 1600, upgradeType: "Slow strength", upgradeCostBase: 14 }
+  { key: "single", name: "Preference Tower", x: 212, y: 245, baseDamage: 0.5, bonusVsBoss: 1, cooldown: 2500, upgradeType: "Boss damage", upgradeCostBase: 14 },
+  { key: "aoe", name: "Budget Tower", x: 372, y: 245, baseDamage: 0.5, splashRadius: 50, cooldown: 3000, upgradeType: "Splash damage", upgradeCostBase: 14 },
+  { key: "slow", name: "Utility Tower", x: 532, y: 245, baseDamage: 0, slowAmount: 0.15, slowDuration: 1000, cooldown: 1600, upgradeType: "Slow strength", upgradeCostBase: 14 }
 ];
 
 const LEVELS = [
@@ -1014,8 +1014,8 @@ function getTowerDefinitions() {
       return {
         ...base,
         level,
-        damage: base.baseDamage + ((level - 1) * 1),
-        bonusVsTank: base.bonusVsTank + ((level - 1) * 1),
+        damage: base.baseDamage + ((level - 1) * 0.5),
+        bonusVsTank: base.bonusVsTank + ((level - 1) * 0.5),
         fireCooldown: Math.max(450, base.fireCooldown - ((level - 1) * 50))
       };
     }
@@ -1024,7 +1024,7 @@ function getTowerDefinitions() {
         ...base,
         level,
         damage: base.baseDamage + ((level - 1) * 1),
-        splashRadius: base.splashRadius + ((level - 1) * 18),
+        splashRadius: base.splashRadius + ((level - 1) * 12),
         fireCooldown: Math.max(700, base.fireCooldown - ((level - 1) * 40))
       };
     }
