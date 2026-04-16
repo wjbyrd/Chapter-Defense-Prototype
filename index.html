@@ -721,6 +721,70 @@ const MAX_REPEAT_TAG_STREAK = 2;
 const MIN_DISTINCT_TAGS_BEFORE_REPEAT = 3;
 const COVERAGE_BOOST = 3;
 
+const WORLD_LAYOUTS = {
+  1: {
+    slotCount: 6,
+    slots: [
+      { id: 0, x: 140, y: 245 },
+      { id: 1, x: 260, y: 245 },
+      { id: 2, x: 380, y: 245 },
+      { id: 3, x: 500, y: 245 },
+      { id: 4, x: 620, y: 245 },
+      { id: 5, x: 740, y: 245 }
+    ]
+  }
+};
+
+const STARTING_GOLD = 18;
+const BUILD_COSTS = {
+  single: 6,
+  aoe: 6,
+  slow: 6
+};
+
+const campaign = {
+  unlockedLevel: 1,
+  bestStars: {},
+  gold: STARTING_GOLD,
+  towers: [],
+  nextTowerId: 1,
+  conceptMemory: {}
+};
+
+const TOWER_TYPES = {
+  single: {
+    key: "single",
+    name: "Preference Tower",
+    baseDamage: 1.2,
+    fireCooldown: 1800,
+    range: 170,
+    bonusVsTank: 1,
+    buildCost: 6,
+    upgradeCostBase: 10
+  },
+  aoe: {
+    key: "aoe",
+    name: "Budget Tower",
+    baseDamage: 1,
+    fireCooldown: 2200,
+    range: 145,
+    splashRadius: 32,
+    buildCost: 6,
+    upgradeCostBase: 12
+  },
+  slow: {
+    key: "slow",
+    name: "Utility Tower",
+    baseDamage: 0,
+    fireCooldown: 1400,
+    range: 140,
+    slowAmount: 0.15,
+    slowDuration: 1000,
+    buildCost: 6,
+    upgradeCostBase: 11
+  }
+};
+  
 const ENEMY_TYPES = {
   grunt: {
     label: "Grunt",
@@ -920,7 +984,7 @@ let state = {
   },
   awaitingWaveQuestion: false,
   awaitingWaveUpgradeChoice: false,
-  killsSinceLastQuestion: 0
+  killsSinceLastQuestion: 0,
 };
 
 const lane = document.getElementById("lane");
