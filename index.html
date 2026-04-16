@@ -658,20 +658,20 @@
     <div class="lane" id="lane">
       <div class="groundline"></div>
 
-      <div class="tower t1">
-        <div class="tower-name">Preference Tower</div>
-        <div class="charge"><div class="charge-fill" id="charge1"></div></div>
-      </div>
+     <div class="tower t1">
+      <div class="tower-name">Preference Tower</div>
+      <div class="charge"><div class="charge-fill" id="charge1"></div></div>
+    </div>
 
-      <div class="tower t2">
-        <div class="tower-name">Budget Tower</div>
-        <div class="charge"><div class="charge-fill" id="charge2"></div></div>
-      </div>
+    <div class="tower t2">
+      <div class="tower-name">Budget Tower</div>
+      <div class="charge"><div class="charge-fill" id="charge2"></div></div>
+    </div>
 
-      <div class="tower t3">
-        <div class="tower-name">Utility Tower</div>
-        <div class="charge"><div class="charge-fill" id="charge3"></div></div>
-      </div>
+   <div class="tower t3">
+      <div class="tower-name">Utility Tower</div>
+      <div class="charge"><div class="charge-fill" id="charge3"></div></div>
+   </div>
 
       <div class="gate"></div>
     </div>
@@ -817,12 +817,6 @@ const ENEMY_TYPES = {
     border: "#92400e"
   }
 };
-
-const BASE_TOWERS = [
-  { key: "single", name: "Preference Tower", x: 212, y: 245, baseDamage: 1, bonusVsTank: 1, fireCooldown: 2000, upgradeType: "Tank damage", upgradeCostBase: 14 },
-  { key: "aoe", name: "Budget Tower", x: 372, y: 245, baseDamage: 1, splashRadius: 50, fireCooldown: 2400, upgradeType: "Splash damage", upgradeCostBase: 14 },
-  { key: "slow", name: "Utility Tower", x: 532, y: 245, baseDamage: 0, slowAmount: 0.15, slowDuration: 1000, fireCooldown: 1400, upgradeType: "Slow strength", upgradeCostBase: 14 }
-];
 
 const LEVELS = [
   {
@@ -990,18 +984,6 @@ const enemyCountStat = document.getElementById("enemyCountStat");
 const accuracyStat = document.getElementById("accuracyStat");
 const goldStat = document.getElementById("goldStat");
 
-const chargeEls = {
-  single: document.getElementById("charge1"),
-  aoe: document.getElementById("charge2"),
-  slow: document.getElementById("charge3")
-};
-
-const towerEls = {
-  single: document.querySelector(".tower.t1"),
-  aoe: document.querySelector(".tower.t2"),
-  slow: document.querySelector(".tower.t3")
-};
-
 document.getElementById("openMapBtn").addEventListener("click", showLevelMap);
 document.getElementById("openGuideBtn").addEventListener("click", showTowerGuide);
 document.getElementById("resetCampaignBtn").addEventListener("click", resetCampaign);
@@ -1035,87 +1017,13 @@ function showWaveBanner(text) {
   setTimeout(() => waveBanner.classList.remove("show"), 1400);
 }
 
-function animateTowerCharge(role) {
-  const el = chargeEls[role];
-  if (!el) return;
-  el.style.width = "100%";
-  setTimeout(() => { el.style.width = "0%"; }, 280);
-}
-
 function addGold(amount) {
   campaign.gold += amount;
   updateStats();
 }
 
-function getTowerByRole(role) {
-  return BASE_TOWERS.find(t => t.key === role);
-}
-  
-function getTowerUpgradeCost(role) {
-  const currentLevel = campaign.towerLevels[role] || 1;
-  const tower = getTowerByRole(role);
-  return (tower?.upgradeCostBase || 14) + ((currentLevel - 1) * 8);
-}
-
-function getTowerDefinitions() {
-  return BASE_TOWERS.map(base => {
-    const level = campaign.towerLevels[base.key] || 1;
-
-    if (base.key === "single") {
-      return {
-        ...base,
-        role: base.key,
-        level,
-        damage: base.baseDamage + ((level - 1) * 0.5),
-        bonusVsTank: base.bonusVsTank + ((level - 1) * 0.5),
-        fireCooldown: Math.max(450, base.fireCooldown - ((level - 1) * 50))
-      };
-    }
-
-    if (base.key === "aoe") {
-      return {
-        ...base,
-        role: base.key,
-        level,
-        damage: base.baseDamage + ((level - 1) * 1),
-        splashRadius: base.splashRadius + ((level - 1) * 12),
-        fireCooldown: Math.max(700, base.fireCooldown - ((level - 1) * 40))
-      };
-    }
-
-    return {
-      ...base,
-      role: base.key,
-      level,
-      damage: base.baseDamage,
-      slowAmount: Math.min(0.5, base.slowAmount + ((level - 1) * 0.05)),
-      slowDuration: base.slowDuration + ((level - 1) * 450),
-      fireCooldown: Math.max(500, base.fireCooldown - ((level - 1) * 40))
-    };
-  });
-}
-  
-function updateTowerVisuals() {
-  Object.entries(towerEls).forEach(([role, el]) => {
-    if (!el) return;
-    const level = campaign.towerLevels[role] || 1;
-    el.classList.add("upgraded");
-    el.classList.remove("level-1", "level-2", "level-3", "level-4", "level-5");
-    el.classList.add(`level-${Math.min(level, 5)}`);
-    let badge = el.querySelector(".tower-level");
-    if (!badge) {
-      badge = document.createElement("div");
-      badge.className = "tower-level";
-      el.appendChild(badge);
-    }
-    badge.textContent = `L${level}`;
-    badge.style.display = level > 1 ? "flex" : "none";
-  });
-}
-
 function clearBattlefieldEntities() {
   document.querySelectorAll(".enemy, .projectile").forEach(el => el.remove());
-  updateTowerVisuals();
 }
 
 function resetLevelState() {
@@ -1137,7 +1045,7 @@ function resetLevelState() {
   state.askedTagsThisLevel = {};
   state.awaitingWaveQuestion = false;
   state.awaitingWaveUpgradeChoice = false;
-  state.autoFireTimers = { single: 0, aoe: 0, slow: 0 };
+  state.autoFireTimers = {};
   state.killsSinceLastQuestion = 0;
   questionOverlay.classList.remove("active");
   resultBox.className = "resultbox";
@@ -1375,19 +1283,6 @@ function showWaveUpgradeChoice() {
   `;
   resultBox.className = "resultbox good";
   resultBox.textContent = "Questions now gate the shop. Towers auto-fire either way.";
-}
-
-function buyTowerUpgrade(role) {
-  if (!state.awaitingWaveUpgradeChoice) return;
-  const cost = getTowerUpgradeCost(role);
-  if (campaign.gold < cost) return;
-  campaign.gold -= cost;
-  campaign.towerLevels[role] = (campaign.towerLevels[role] || 1) + 1;
-  updateTowerVisuals();
-  updateStats();
-  const tower = getTowerByRole(role);
-  logMessage(`${tower.name} upgraded to level ${campaign.towerLevels[role]}. -${cost} gold.`, "good");
-  showWaveUpgradeChoice();
 }
 
 function startNextWave() {
