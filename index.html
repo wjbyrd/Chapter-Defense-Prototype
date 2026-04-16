@@ -1569,38 +1569,47 @@ function updateProjectiles() {
   });
 }
 
+function checkLevelEndOrQuestionGate() {
+  const waveEntries = getCurrentWaveEntries();
+  const isFinalWave = state.waveIndex === state.currentLevel.waves.length - 1;
+  const waveFullySpawned = state.enemiesSpawnedInWave >= waveEntries.length;
+  const laneClear = state.enemies.length === 0;
+
+  if (isFinalWave && laneClear && waveFullySpawned) {
+    completeLevel();
+    return true;
+  }
+
+  if (
+    state.killsSinceLastQuestion >= 3 &&
+    !state.awaitingWaveQuestion &&
+    !state.awaitingWaveUpgradeChoice &&
+    !state.questionOpen &&
+    !state.gameOver
+  ) {
+    state.killsSinceLastQuestion = 0;
+    showWaveQuestionGate();
+    return true;
+  }
+
+  return false;
+}  
+  
 function destroyEnemy(enemy) {
   if (enemy.element) enemy.element.remove();
   if (enemy.slowTimeout) clearTimeout(enemy.slowTimeout);
+
   state.enemies = state.enemies.filter(e => e.id !== enemy.id);
-addGold(enemy.gold);
-logMessage(`${ENEMY_TYPES[enemy.typeKey].label} destroyed. +${enemy.gold} gold.`, "good");
 
-state.killsSinceLastQuestion++;
+  addGold(enemy.gold);
+  logMessage(`${ENEMY_TYPES[enemy.typeKey].label} destroyed. +${enemy.gold} gold.`, "good");
 
-if (
-  state.killsSinceLastQuestion >= 3 &&
-  !state.awaitingWaveQuestion &&
-  !state.awaitingWaveUpgradeChoice &&
-  !state.questionOpen &&
-  !state.gameOver
-) {
-  state.killsSinceLastQuestion = 0;
-  showWaveQuestionGate();
-  return;
+  state.killsSinceLastQuestion++;
+  updateStats();
+
+  checkLevelEndOrQuestionGate();
 }
-
-updateStats();
-
-const waveEntries = getCurrentWaveEntries();
-const finishedFinalWave =
-  state.waveIndex === state.currentLevel.waves.length - 1 &&
-  state.enemies.length === 0 &&
-  state.enemiesSpawnedInWave >= waveEntries.length;
-
-if (finishedFinalWave) completeLevel();
-}
-
+  
 function advanceEnemies(delta) {
   const gateX = lane.clientWidth - 100;
 
@@ -1640,14 +1649,23 @@ function handleWaveSpawning(delta) {
     state.enemiesSpawnedInWave++;
   }
 
+  const waveFullySpawned = state.enemiesSpawnedInWave >= entries.length;
+  const laneClear = state.enemies.length === 0;
+  const isFinalWave = state.waveIndex === state.currentLevel.waves.length - 1;
+
   if (
-    state.enemiesSpawnedInWave >= entries.length &&
-    state.enemies.length === 0 &&
-    state.waveIndex < state.currentLevel.waves.length - 1 &&
+    waveFullySpawned &&
+    laneClear &&
     !state.awaitingWaveQuestion &&
-    !state.awaitingWaveUpgradeChoice
+    !state.awaitingWaveUpgradeChoice &&
+    !state.questionOpen &&
+    !state.gameOver
   ) {
-    showWaveQuestionGate();
+    if (isFinalWave) {
+      completeLevel();
+    } else {
+      showWaveQuestionGate();
+    }
   }
 }
 
