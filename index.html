@@ -724,10 +724,10 @@ const COVERAGE_BOOST = 3;
 const ENEMY_TYPES = {
   grunt: {
     label: "Grunt",
-    hp: 4,
+    hp: 5,
     speedMult: 1.0,
     gold: 0.5,
-    breachDps: 0.8,
+    breachDps: 0.9,
     size: 40,
     fill: "radial-gradient(circle at 30% 30%, #fca5a5, #b91c1c 65%)",
     border: "#7f1d1d"
@@ -735,19 +735,19 @@ const ENEMY_TYPES = {
   sprinter: {
     label: "Sprinter",
     hp: 4,
-    speedMult: 1.35,
+    speedMult: 1.4,
     gold: 1,
-    breachDps: 1.1,
+    breachDps: 1.2,
     size: 30,
     fill: "radial-gradient(circle at 30% 30%, #93c5fd, #1d4ed8 68%)",
     border: "#1e3a8a"
   },
   tank: {
     label: "Tank",
-    hp: 14,
-    speedMult: 0.7,
+    hp: 15,
+    speedMult: 0.75,
     gold: 2,
-    breachDps: 2.4,
+    breachDps: 2.6,
     size: 60,
     fill: "radial-gradient(circle at 30% 30%, #fde68a, #b45309 70%)",
     border: "#92400e"
@@ -770,9 +770,9 @@ const LEVELS = [
     projectileSpeed: 8,
     spawnDelay: 1400,
     waves: [
-      { entries: ["grunt","grunt","grunt","sprinter","grunt"] },
-      { entries: ["grunt","grunt","sprinter","grunt","tank"] },
-      { entries: ["grunt","sprinter","grunt","tank","grunt","sprinter"] }
+      { entries: ["grunt","grunt","grunt","sprinter","grunt","grunt"] },
+      { entries: ["grunt","grunt",,"grunt","sprinter","sprinter","grunt","tank"] },
+      { entries: ["grunt","grunt","grunt","sprinter","sprinter","grunt","tank","tank","grunt","sprinter","sprinter"] }
     ]
   },
   {
@@ -784,9 +784,9 @@ const LEVELS = [
     projectileSpeed: 8.5,
     spawnDelay: 950,
     waves: [
-      { entries: ["grunt","sprinter","grunt","sprinter","tank"] },
-      { entries: ["grunt","grunt","tank","sprinter","sprinter","grunt"] },
-      { entries: ["tank","grunt","sprinter","grunt","tank","sprinter"] }
+      { entries: ["grunt","sprinter","grunt","sprinter","sprinter","tank"] },
+      { entries: ["grunt","grunt","grunt","tank","sprinter","sprinter","grunt","tank"] },
+      { entries: ["tank","grunt","sprinter","grunt","tank","sprinter","tank","grunt","sprinter",] }
     ]
   },
   {
@@ -798,9 +798,9 @@ const LEVELS = [
     projectileSpeed: 9,
     spawnDelay: 850,
     waves: [
-      { entries: ["grunt","sprinter","tank","grunt","sprinter","grunt"] },
-      { entries: ["tank","sprinter","grunt","sprinter","tank","grunt","grunt"] },
-      { entries: ["tank","tank","sprinter","grunt","sprinter","grunt","tank"] }
+      { entries: ["grunt","sprinter","tank","grunt","sprinter","grunt","grunt","sprinter","tank","grunt","sprinter",] },
+      { entries: ["tank","sprinter","grunt","sprinter","tank","grunt","grunt","tank","sprinter","grunt","sprinter","tank"] },
+      { entries: ["tank","tank","sprinter","grunt","sprinter","grunt","tank","tank","sprinter","tank","grunt","sprinter","grunt"] }
     ]
   }
 ];
@@ -1781,13 +1781,24 @@ function showTowerGuide() {
 function closeOverlayResume() {
   questionOverlay.classList.remove("active");
   state.questionOpen = false;
+
   if (!state.gameOver && !state.awaitingWaveQuestion && !state.awaitingWaveUpgradeChoice) {
     state.paused = false;
+
+    if (!state.running && state.currentLevel) {
+      state.running = true;
+      state.lastFrame = performance.now();
+      requestAnimationFrame(gameLoop);
+    }
   }
 }
 
 function showLevelMap() {
-  state.running = false;
+  const canResumeRun =
+    state.currentLevel &&
+    !state.gameOver &&
+    (state.running || state.paused);
+
   state.paused = true;
   state.questionOpen = true;
   questionOverlay.classList.add("active");
@@ -1834,6 +1845,7 @@ function showLevelMap() {
     ${getChapterPersistenceHTML()}
     <div class="controls">
       <button class="secondary" onclick="showTowerGuide()">Tower Guide</button>
+      ${canResumeRun ? `<button class="primary" onclick="closeOverlayResume()">Return to Battle</button>` : ``}
     </div>
   `;
   resultBox.className = "resultbox";
