@@ -186,10 +186,6 @@
     transition:width .2s ease;
   }
 
-  .tower.t1{ left:180px; }
-  .tower.t2{ left:340px; }
-  .tower.t3{ left:500px; }
-
   .tower.upgraded{
     transition:transform .2s ease, box-shadow .2s ease, filter .2s ease;
   }
@@ -1223,25 +1219,10 @@ function renderWaveShopHTML() {
     <div class="wave-shop">
       <h4>Spend Gold Before the Next Wave</h4>
       <div class="gold-line">Current Gold: ${campaign.gold}</div>
-      <div class="shop-grid">
-        ${towers.map(tower => {
-          const canAfford = campaign.gold >= nextCost;
-          const detail = tower.role === "single"
-            ? `Damage ${tower.damage} → ${tower.damage + 1}, Tank Bonus ${tower.bonusVsTank} → ${tower.bonusVsTank + 1}`
-            : tower.role === "aoe"
-              ? `Damage ${tower.damage} → ${tower.damage + 1}, Radius ${tower.splashRadius} → ${tower.splashRadius + 18}`
-              : `Slow ${Math.round(tower.slowAmount * 100)}% → ${Math.round(Math.min(50, (tower.slowAmount + 0.05) * 100))}%, Duration ${Math.round(tower.slowDuration / 1000)}s → ${Math.round((tower.slowDuration + 450) / 1000)}s`;
-
-          return `
-            <div class="shop-card">
-              <h5>${tower.name} (L${tower.level})</h5>
-              <p>${detail}</p>
-              <div class="shop-meta">Cost: ${nextCost} gold</div>
-              <button class="${canAfford ? "primary" : "secondary"}" ${canAfford ? "" : "disabled"} onclick="buyTowerUpgrade('${tower.role}')">Upgrade</button>
-            </div>
-          `;
-        }).join("")}
-      </div>
+      <p style="color:#cbd5e1; margin:0;">
+        Tower building and per-tower upgrades are being rewired for the new slot-based system.
+        The old fixed-role upgrade shop has been removed.
+      </p>
     </div>
   `;
 }
@@ -1697,20 +1678,20 @@ function getChapterPersistenceHTML() {
 function renderTowerGuideHTML() {
   return `
     <div class="upgrade-grid">
-      ${towers.map(tower => {
-        const detail = tower.role === "single"
-          ? `Single-target finisher. Damage ${tower.damage}. Bonus vs tanks ${tower.bonusVsTank}. Targets breaching and tank threats first.`
-          : tower.role === "aoe"
-            ? `Wave clearer. Damage ${tower.damage}. Splash radius ${tower.splashRadius}. Best when grunts stack up.`
-            : `Control tower. Damage ${tower.damage}. Slow ${Math.round(tower.slowAmount * 100)}% for ${Math.round(tower.slowDuration / 1000)}s. Focuses fast movers.`;
-        return `
-          <div class="upgrade-card">
-            <h4>${tower.name} (L${tower.level})</h4>
-            <p>${detail}</p>
-            <div class="shop-meta">Next upgrade cost: ${getTowerUpgradeCost(tower.role)} gold</div>
-          </div>
-        `;
-      }).join("")}
+      ${Object.values(TOWER_TYPES).map(tower => `
+        <div class="upgrade-card">
+          <h4>${tower.name}</h4>
+          <p>
+            Build Cost: ${tower.buildCost}<br>
+            Base Cooldown: ${tower.fireCooldown} ms<br>
+            Range: ${tower.range}
+            ${tower.bonusVsTank ? `<br>Tank Bonus: ${tower.bonusVsTank}` : ""}
+            ${tower.splashRadius ? `<br>Splash Radius: ${tower.splashRadius}` : ""}
+            ${tower.slowAmount ? `<br>Slow: ${Math.round(tower.slowAmount * 100)}% for ${Math.round(tower.slowDuration / 1000)}s` : ""}
+          </p>
+          <div class="shop-meta">Upgrade base cost: ${tower.upgradeCostBase} gold</div>
+        </div>
+      `).join("")}
     </div>
   `;
 }
@@ -1750,12 +1731,11 @@ function showTowerGuide() {
       <div style="color:#cbd5e1; line-height:1.5;">
         Clear a wave and you get one adaptive question. Answer correctly and the between-wave shop opens so you can spend gold. Answer wrong and the next wave starts with no shop. That is the new tradeoff.
       </div>
-      <div class="pill-list" style="margin-top:10px;">
-        <span class="pill">Gold: ${campaign.gold}</span>
-        <span class="pill">Preference L${campaign.towerLevels.single}</span>
-        <span class="pill">Budget L${campaign.towerLevels.aoe}</span>
-        <span class="pill">Utility L${campaign.towerLevels.slow}</span>
-      </div>
+  <div class="pill-list" style="margin-top:10px;">
+    <span class="pill">Gold: ${campaign.gold}</span>
+    <span class="pill">Placed Towers: ${campaign.towers.length}</span>
+    <span class="pill">Open Slots: ${getCurrentWorldLayout().slotCount - campaign.towers.length}</span>
+  </div>
     </div>
     <div class="active-upgrades">
       <strong>Weak-Tag Pressure</strong>
