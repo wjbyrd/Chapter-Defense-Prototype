@@ -724,7 +724,7 @@ const COVERAGE_BOOST = 3;
 const ENEMY_TYPES = {
   grunt: {
     label: "Grunt",
-    hp: 6,
+    hp: 4,
     speedMult: 1.0,
     gold: 0.5,
     breachDps: 0.8,
@@ -734,8 +734,8 @@ const ENEMY_TYPES = {
   },
   sprinter: {
     label: "Sprinter",
-    hp: 5,
-    speedMult: 1.5,
+    hp: 4,
+    speedMult: 1.35,
     gold: 1,
     breachDps: 1.1,
     size: 30,
@@ -744,7 +744,7 @@ const ENEMY_TYPES = {
   },
   tank: {
     label: "Tank",
-    hp: 18,
+    hp: 14,
     speedMult: 0.7,
     gold: 2,
     breachDps: 2.4,
@@ -768,7 +768,7 @@ const LEVELS = [
     gateHealth: 20,
     enemySpeed: 0.34,
     projectileSpeed: 8,
-    spawnDelay: 1100,
+    spawnDelay: 1400,
     waves: [
       { entries: ["grunt","grunt","grunt","sprinter","grunt"] },
       { entries: ["grunt","grunt","sprinter","grunt","tank"] },
@@ -1011,26 +1011,32 @@ function getTowerUpgradeCost(role) {
 function getTowerDefinitions() {
   return BASE_TOWERS.map(base => {
     const level = campaign.towerLevels[base.key] || 1;
+
     if (base.key === "single") {
       return {
         ...base,
+        role: base.key,
         level,
         damage: base.baseDamage + ((level - 1) * 0.5),
         bonusVsTank: base.bonusVsTank + ((level - 1) * 0.5),
         fireCooldown: Math.max(450, base.fireCooldown - ((level - 1) * 50))
       };
     }
+
     if (base.key === "aoe") {
       return {
         ...base,
+        role: base.key,
         level,
         damage: base.baseDamage + ((level - 1) * 1),
         splashRadius: base.splashRadius + ((level - 1) * 12),
         fireCooldown: Math.max(700, base.fireCooldown - ((level - 1) * 40))
       };
     }
+
     return {
       ...base,
+      role: base.key,
       level,
       damage: base.baseDamage,
       slowAmount: Math.min(0.5, base.slowAmount + ((level - 1) * 0.05)),
@@ -1039,7 +1045,7 @@ function getTowerDefinitions() {
     };
   });
 }
-
+  
 function updateTowerVisuals() {
   Object.entries(towerEls).forEach(([role, el]) => {
     if (!el) return;
@@ -1573,7 +1579,7 @@ logMessage(`${ENEMY_TYPES[enemy.typeKey].label} destroyed. +${enemy.gold} gold.`
 state.killsSinceLastQuestion++;
 
 if (
-  state.killsSinceLastQuestion >= 5 &&
+  state.killsSinceLastQuestion >= 3 &&
   !state.awaitingWaveQuestion &&
   !state.awaitingWaveUpgradeChoice &&
   !state.questionOpen &&
