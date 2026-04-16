@@ -1369,28 +1369,31 @@ function getCurrentWave() {
 function getCurrentWaveEntries() {
   return getCurrentWave().entries;
 }
-
+  
 function getTowerTarget(tower) {
-  const live = state.enemies.filter(e => e.hp > 0);
-  if (!live.length) return null;
+  const slot = getSlotById(tower.slotId);
+  const stats = getTowerStats(tower);
 
-  if (tower.role === "single") {
-    return [...live].sort((a, b) => {
-      const scoreA = (a.breaching ? 1000 : 0) + (a.typeKey === "tank" ? 250 : 0) + a.x + a.hp;
-      const scoreB = (b.breaching ? 1000 : 0) + (b.typeKey === "tank" ? 250 : 0) + b.x + b.hp;
+  const inRange = state.enemies.filter(enemy => {
+    const enemyCenterX = enemy.x + (enemy.typeKey === "tank" ? 30 : 18);
+    return Math.abs(enemyCenterX - slot.x) <= stats.range && enemy.hp > 0;
+  });
+
+  if (!inRange.length) return null;
+
+  if (tower.type === "single") {
+    return [...inRange].sort((a, b) => {
+      const scoreA = (a.breaching ? 1000 : 0) + (a.typeKey === "tank" ? 250 : 0) + a.x;
+      const scoreB = (b.breaching ? 1000 : 0) + (b.typeKey === "tank" ? 250 : 0) + b.x;
       return scoreB - scoreA;
     })[0];
   }
 
-  if (tower.role === "aoe") {
-    return [...live].sort((a, b) => b.x - a.x)[0];
+  if (tower.type === "aoe") {
+    return [...inRange].sort((a, b) => b.x - a.x)[0];
   }
 
-  return [...live].sort((a, b) => {
-    const speedA = a.breaching ? 999 : a.speed;
-    const speedB = b.breaching ? 999 : b.speed;
-    return speedB - speedA || b.x - a.x;
-  })[0];
+  return [...inRange].sort((a, b) => b.speed - a.speed || b.x - a.x)[0];
 }
 
 function updateAutoFire(delta) {
