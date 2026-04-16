@@ -190,6 +190,97 @@
   .tower.t2{ left:340px; }
   .tower.t3{ left:500px; }
 
+  .tower.upgraded{
+    transition:transform .2s ease, box-shadow .2s ease, filter .2s ease;
+  }
+
+  .tower.upgraded.level-2{
+    transform:scale(1.07);
+    box-shadow:0 0 18px rgba(245,158,11,.35);
+  }
+
+  .tower.upgraded.level-3{
+    transform:scale(1.12);
+    box-shadow:0 0 24px rgba(245,158,11,.5);
+    filter:brightness(1.08);
+  }
+
+  .tower.upgraded.level-4,
+  .tower.upgraded.level-5{
+    transform:scale(1.16);
+    box-shadow:0 0 30px rgba(245,158,11,.65);
+    filter:brightness(1.12);
+  }
+
+  .tower-level{
+    position:absolute;
+    top:-12px;
+    right:-10px;
+    min-width:26px;
+    height:26px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    border-radius:999px;
+    background:#f59e0b;
+    color:#111827;
+    font-size:.72rem;
+    font-weight:bold;
+    border:2px solid #f8fafc;
+    box-shadow:0 0 10px rgba(245,158,11,.45);
+  }
+
+  .wave-shop{
+    margin-top:16px;
+    padding:14px;
+    background:#111827;
+    border:1px solid #334155;
+    border-radius:14px;
+  }
+
+  .wave-shop h4{
+    margin:0 0 10px 0;
+    font-size:1rem;
+  }
+
+  .gold-line{
+    margin:8px 0 14px 0;
+    color:#fde68a;
+    font-weight:bold;
+  }
+
+  .shop-grid{
+    display:grid;
+    grid-template-columns:repeat(3, minmax(180px, 1fr));
+    gap:12px;
+  }
+
+  .shop-card{
+    background:#0b1220;
+    border:1px solid #334155;
+    border-radius:14px;
+    padding:14px;
+  }
+
+  .shop-card h5{
+    margin:0 0 8px 0;
+    font-size:1rem;
+  }
+
+  .shop-card p{
+    margin:0 0 8px 0;
+    color:#cbd5e1;
+    font-size:.9rem;
+    line-height:1.4;
+  }
+
+  .shop-meta{
+    color:#fde68a;
+    font-size:.86rem;
+    margin-bottom:10px;
+    font-weight:bold;
+  }
+
   .enemy{
     position:absolute;
     bottom:96px;
@@ -525,6 +616,9 @@
     .upgrade-grid{
       grid-template-columns:1fr;
     }
+    .shop-grid{
+      grid-template-columns:1fr;
+    }
   }
 
   @media (max-width: 650px){
@@ -553,6 +647,7 @@
       <div class="stat"><span class="label">Wave</span><span class="value" id="waveStat">0 / 0</span></div>
       <div class="stat"><span class="label">Enemies Left</span><span class="value" id="enemyCountStat">0</span></div>
       <div class="stat"><span class="label">Accuracy</span><span class="value" id="accuracyStat">0%</span></div>
+      <div class="stat"><span class="label">Gold</span><span class="value" id="goldStat">0</span></div>
     </div>
   </div>
 
@@ -600,8 +695,8 @@
 
     <div class="panel">
       <h2>What Changed</h2>
-      <p>This build fixes the clipped overlay, removes the useless question number title spam, clarifies gate bonuses, and adds weak-tag adaptation.</p>
-      <p>Miss a concept and the game leans on it harder. Boss phase starts hunting your weakest category first.</p>
+      <p>This build now adds in-run gold, between-wave tower upgrades, visual tower growth, and the adaptive tag system already in place.</p>
+      <p>Kill enemies, earn gold, strengthen towers between waves, and let upgraded defenses actually look stronger.</p>
       <div class="controls">
         <button class="primary" id="openMapBtn">Open Level Map</button>
         <button class="secondary" id="resetCampaignBtn">Reset Campaign</button>
@@ -620,6 +715,18 @@ const CHAPTER = {
 const FEEDBACK_DELAY_MS = 1800;
 const RECENT_TAG_WINDOW = 4;
 const MAX_TAG_WEIGHT_BONUS = 4;
+
+const ENEMY_GOLD_VALUES = {
+  standard: 3,
+  boss: 10
+};
+
+const BASE_TOWERS = [
+  { key: "single", name: "Preference Tower", x: 212, y: 245, baseDamage: 3, bonusVsBoss: 2, upgradeType: "Boss damage", upgradeCostBase: 8 },
+  { key: "aoe", name: "Budget Tower", x: 372, y: 245, baseDamage: 1, splashRadius: 70, upgradeType: "Splash damage", upgradeCostBase: 8 },
+  { key: "slow", name: "Utility Tower", x: 532, y: 245, baseDamage: 1, slowAmount: 0.2, slowDuration: 3000, upgradeType: "Slow strength", upgradeCostBase: 8 }
+];
+
 
 const LEVELS = [
   {
@@ -779,7 +886,13 @@ const campaign = {
     damageBonus: 0,
     slowFactor: 0
   },
-  chosenUpgrades: []
+  chosenUpgrades: [],
+  gold: 0,
+  towerLevels: {
+    single: 1,
+    aoe: 1,
+    slow: 1
+  }
 };
 
 let state = {
@@ -805,7 +918,8 @@ let state = {
   conceptMemory: {},
   tagHistory: [],
   askedQuestionIds: [],
-  pendingQuestion: null
+  pendingQuestion: null,
+  awaitingWaveUpgradeChoice: false
 };
 
 const lane = document.getElementById("lane");
@@ -824,12 +938,19 @@ const gateHealthStat = document.getElementById("gateHealthStat");
 const waveStat = document.getElementById("waveStat");
 const enemyCountStat = document.getElementById("enemyCountStat");
 const accuracyStat = document.getElementById("accuracyStat");
+const goldStat = document.getElementById("goldStat");
 
 const chargeEls = [
   document.getElementById("charge1"),
   document.getElementById("charge2"),
   document.getElementById("charge3")
 ];
+
+const towerEls = {
+  single: document.querySelector(".tower.t1"),
+  aoe: document.querySelector(".tower.t2"),
+  slow: document.querySelector(".tower.t3")
+};
 
 document.getElementById("openMapBtn").addEventListener("click", showLevelMap);
 document.getElementById("resetCampaignBtn").addEventListener("click", resetCampaign);
@@ -873,6 +994,73 @@ function renderActiveUpgradesHTML() {
   `;
 }
 
+
+function getTowerUpgradeCost(role) {
+  const currentLevel = campaign.towerLevels[role] || 1;
+  const tower = BASE_TOWERS.find(t => t.key === role);
+  return (tower?.upgradeCostBase || 8) + ((currentLevel - 1) * 5);
+}
+
+function getTowerByRole(role) {
+  return BASE_TOWERS.find(t => t.key === role);
+}
+
+function getTowerDefinitions() {
+  return BASE_TOWERS.map(tower => {
+    const level = campaign.towerLevels[tower.key] || 1;
+    if (tower.key === "single") {
+      return {
+        ...tower,
+        level,
+        role: "single",
+        damage: tower.baseDamage + ((level - 1) * 1),
+        bonusVsBoss: tower.bonusVsBoss + ((level - 1) * 1)
+      };
+    }
+    if (tower.key === "aoe") {
+      return {
+        ...tower,
+        level,
+        role: "aoe",
+        damage: tower.baseDamage + ((level - 1) * 1),
+        splashRadius: tower.splashRadius + ((level - 1) * 15)
+      };
+    }
+    return {
+      ...tower,
+      level,
+      role: "slow",
+      damage: tower.baseDamage,
+      slowAmount: Math.min(0.5, tower.slowAmount + ((level - 1) * 0.05)),
+      slowDuration: tower.slowDuration + ((level - 1) * 500)
+    };
+  });
+}
+
+function updateTowerVisuals() {
+  Object.entries(towerEls).forEach(([role, el]) => {
+    if (!el) return;
+    const level = campaign.towerLevels[role] || 1;
+    el.classList.add("upgraded");
+    el.classList.remove("level-1", "level-2", "level-3", "level-4", "level-5");
+    el.classList.add(`level-${Math.min(level, 5)}`);
+
+    let badge = el.querySelector(".tower-level");
+    if (!badge) {
+      badge = document.createElement("div");
+      badge.className = "tower-level";
+      el.appendChild(badge);
+    }
+    badge.textContent = `L${level}`;
+    badge.style.display = level > 1 ? "flex" : "none";
+  });
+}
+
+function addGold(amount) {
+  campaign.gold += amount;
+  updateStats();
+}
+
 function updateStats() {
   gateHealthStat.textContent = state.gateHealth;
   if (state.currentLevel) {
@@ -882,6 +1070,7 @@ function updateStats() {
   }
   enemyCountStat.textContent = state.enemies.length;
   accuracyStat.textContent = `${getCurrentAccuracy()}%`;
+  goldStat.textContent = campaign.gold;
 }
 
 function showWaveBanner(text) {
@@ -893,6 +1082,7 @@ function showWaveBanner(text) {
 function clearBattlefieldEntities() {
   document.querySelectorAll(".enemy, .projectile").forEach(el => el.remove());
   chargeEls.forEach(el => el.style.width = "0%");
+  updateTowerVisuals();
 }
 
 function resetLevelState() {
@@ -911,6 +1101,7 @@ function resetLevelState() {
   state.enemiesSpawnedInWave = 0;
   state.questionOpen = false;
   state.awaitingUpgradeChoice = false;
+  state.awaitingWaveUpgradeChoice = false;
   state.tagHistory = [];
   state.askedQuestionIds = [];
   state.pendingQuestion = null;
@@ -954,6 +1145,7 @@ function startLevel(levelIndex) {
   if (getActiveUpgradePills().length) {
     logMessage(`Run upgrades active: ${getActiveUpgradePills().join(", ")}.`, "note");
   }
+  updateTowerVisuals();
   showWaveBanner("Wave 1");
   updateStats();
   requestAnimationFrame(gameLoop);
@@ -1012,6 +1204,15 @@ function showLevelMap() {
   answersBox.innerHTML = `
     <div class="level-list">${rows}</div>
     ${renderActiveUpgradesHTML()}
+    <div class="active-upgrades">
+      <strong>Run Economy</strong>
+      <div class="pill-list">
+        <span class="pill">Gold: ${campaign.gold}</span>
+        <span class="pill">Preference L${campaign.towerLevels.single}</span>
+        <span class="pill">Budget L${campaign.towerLevels.aoe}</span>
+        <span class="pill">Utility L${campaign.towerLevels.slow}</span>
+      </div>
+    </div>
     <div class="active-upgrades">
       <strong>Weak-Tag Pressure</strong>
       ${getTagBreakdownHTML()}
@@ -1150,11 +1351,7 @@ function handleAnswer(question, selectedIndex) {
 }
 
 function fireTowerVolley() {
-  const towers = [
-    { name: "Preference Tower", role: "single", x: 212, y: 245, damage: 3, bonusVsBoss: 2 },
-    { name: "Budget Tower", role: "aoe", x: 372, y: 245, damage: 1, splashRadius: 70 },
-    { name: "Utility Tower", role: "slow", x: 532, y: 245, damage: 1, slowAmount: 0.2, slowDuration: 3000 }
-  ];
+  const towers = getTowerDefinitions();
 
   chargeEls.forEach(el => {
     el.style.width = "100%";
@@ -1368,30 +1565,15 @@ function updateProjectiles() {
   });
 }
 
-function applySlowEffect(enemy, slowAmount, slowDuration) {
-  if (!enemy || enemy.hp <= 0) return;
-
+function destroyEnemy(enemy) {
+  enemy.element.remove();
   if (enemy.slowTimeout) {
     clearTimeout(enemy.slowTimeout);
   }
-
-  if (enemy.originalSpeed == null) {
-    enemy.originalSpeed = enemy.speed;
-  }
-
-  enemy.speed = enemy.originalSpeed * (1 - slowAmount);
-
-  enemy.slowTimeout = setTimeout(() => {
-    if (enemy && enemy.hp > 0) {
-      enemy.speed = enemy.originalSpeed;
-    }
-  }, slowDuration);
-}
-  
-function destroyEnemy(enemy) {
-  enemy.element.remove();
   state.enemies = state.enemies.filter(e => e.id !== enemy.id);
-  logMessage(enemy.boss ? "Boss unit destroyed." : "Enemy destroyed.", "good");
+  const goldEarned = enemy.boss ? ENEMY_GOLD_VALUES.boss : ENEMY_GOLD_VALUES.standard;
+  addGold(goldEarned);
+  logMessage(enemy.boss ? `Boss unit destroyed. +${goldEarned} gold.` : `Enemy destroyed. +${goldEarned} gold.`, "good");
   updateStats();
 
   const currentWave = state.currentLevel.waves[state.waveIndex];
@@ -1441,15 +1623,13 @@ function handleWaveSpawning(delta) {
     updateStats();
   }
 
-  if (state.enemiesSpawnedInWave >= wave.count && state.enemies.length === 0) {
-    if (state.waveIndex < state.currentLevel.waves.length - 1) {
-      state.waveIndex++;
-      state.enemiesSpawnedInWave = 0;
-      state.spawnTimer = 0;
-      showWaveBanner(`Wave ${state.waveIndex + 1}`);
-      logMessage(`Wave ${state.waveIndex + 1} begins.`, "note");
-      updateStats();
-    }
+  if (
+    state.enemiesSpawnedInWave >= wave.count &&
+    state.enemies.length === 0 &&
+    state.waveIndex < state.currentLevel.waves.length - 1 &&
+    !state.awaitingWaveUpgradeChoice
+  ) {
+    showWaveUpgradeChoice();
   }
 }
 
@@ -1484,6 +1664,89 @@ function renderMiniStars(count) {
     html += i <= count ? "★" : "☆";
   }
   return html;
+}
+
+
+function renderWaveShopHTML() {
+  const towers = getTowerDefinitions();
+  return `
+    <div class="wave-shop">
+      <h4>Spend Gold Before the Next Wave</h4>
+      <div class="gold-line">Current Gold: ${campaign.gold}</div>
+      <div class="shop-grid">
+        ${towers.map(tower => {
+          const nextCost = getTowerUpgradeCost(tower.role);
+          const canAfford = campaign.gold >= nextCost;
+          const detail = tower.role === "single"
+            ? `Damage ${tower.damage} → ${tower.damage + 1}, Boss Bonus ${tower.bonusVsBoss} → ${tower.bonusVsBoss + 1}`
+            : tower.role === "aoe"
+              ? `Damage ${tower.damage} → ${tower.damage + 1}, Radius ${tower.splashRadius} → ${tower.splashRadius + 15}`
+              : `Slow ${Math.round(tower.slowAmount * 100)}% → ${Math.round(Math.min(0.5, tower.slowAmount + 0.05) * 100)}%, Duration ${Math.round(tower.slowDuration / 1000)}s → ${Math.round((tower.slowDuration + 500) / 1000)}s`;
+
+          return `
+            <div class="shop-card">
+              <h5>${tower.name} (L${tower.level})</h5>
+              <p>${detail}</p>
+              <div class="shop-meta">Cost: ${nextCost} gold</div>
+              <button class="${canAfford ? "primary" : "secondary"}" ${canAfford ? "" : "disabled"} onclick="buyTowerUpgrade('${tower.role}')">Upgrade</button>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function showWaveUpgradeChoice() {
+  state.awaitingWaveUpgradeChoice = true;
+  state.paused = true;
+  state.questionOpen = true;
+  questionOverlay.classList.add("active");
+
+  questionTitle.textContent = `Wave ${state.waveIndex + 1} Cleared`;
+  questionTag.textContent = "Between-Wave Shop";
+  questionText.textContent = "The lane is clear. Spend gold to strengthen your towers before the next wave hits.";
+
+  answersBox.innerHTML = `
+    ${renderWaveShopHTML()}
+    <div class="controls">
+      <button class="primary" onclick="startNextWave()">Start Next Wave</button>
+    </div>
+  `;
+  resultBox.className = "resultbox good";
+  resultBox.textContent = "Upgraded towers grow and glow so the power-up actually shows.";
+}
+
+function buyTowerUpgrade(role) {
+  if (!state.awaitingWaveUpgradeChoice) return;
+  const cost = getTowerUpgradeCost(role);
+  if (campaign.gold < cost) return;
+
+  campaign.gold -= cost;
+  campaign.towerLevels[role] = (campaign.towerLevels[role] || 1) + 1;
+  updateTowerVisuals();
+  updateStats();
+
+  const tower = getTowerByRole(role);
+  logMessage(`${tower.name} upgraded to level ${campaign.towerLevels[role]}. -${cost} gold.`, "good");
+  showWaveUpgradeChoice();
+}
+
+function startNextWave() {
+  if (!state.awaitingWaveUpgradeChoice) return;
+
+  state.awaitingWaveUpgradeChoice = false;
+  state.questionOpen = false;
+  state.paused = false;
+  questionOverlay.classList.remove("active");
+
+  state.waveIndex++;
+  state.enemiesSpawnedInWave = 0;
+  state.spawnTimer = 0;
+  state.questionTimer = 0;
+  showWaveBanner(`Wave ${state.waveIndex + 1}`);
+  logMessage(`Wave ${state.waveIndex + 1} begins.`, "note");
+  updateStats();
 }
 
 function showUpgradeChoice(nextLevelExists) {
@@ -1694,6 +1957,12 @@ function resetCampaign() {
     slowFactor: 0
   };
   campaign.chosenUpgrades = [];
+  campaign.gold = 0;
+  campaign.towerLevels = {
+    single: 1,
+    aoe: 1,
+    slow: 1
+  };
   state.conceptMemory = {};
   logBox.innerHTML = "";
   resetLevelState();
@@ -1725,10 +1994,14 @@ window.startNextLevel = startNextLevel;
 window.showLevelMap = showLevelMap;
 window.chooseUpgrade = chooseUpgrade;
 window.proceedAfterVictory = proceedAfterVictory;
+window.buyTowerUpgrade = buyTowerUpgrade;
+window.startNextWave = startNextWave;
 
 loadLevel(0);
+updateTowerVisuals();
 showLevelMap();
 logMessage("Campaign ready. Pick a level and defend the chapter.", "note");
 </script>
 </body>
 </html>
+
