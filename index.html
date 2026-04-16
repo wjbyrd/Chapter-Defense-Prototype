@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Chapter Defense Prototype</title>
+<style>
+  :root{
+    --bg:#111827;
+    --panel:#1f2937;
+    --panel2:#0f172a;
+    --text:#f9fafb;
+    --muted:#cbd5e1;
+    --accent:#f59e0b;
+    --good:#22c55e;
+    --bad:#ef4444;
+    --line:#334155;
+  }
+
+  * { box-sizing: border-box; }
+
+  body{
+    margin:0;
+    font-family:Arial, Helvetica, sans-serif;
+    background:linear-gradient(180deg,#0b1020,#111827 40%,#1e293b);
+    color:var(--text);
+  }
+
+  .wrap{
+    max-width:1200px;
+    margin:0 auto;
+    padding:20px;
+  }
+
+  .topbar{
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:16px;
+  }
+
+  .titlebox{
+    background:rgba(15,23,42,.9);
+    border:1px solid var(--line);
+    padding:14px 18px;
+    border-radius:14px;
+    min-width:280px;
+  }
+
+  .titlebox h1{
+    margin:0 0 6px 0;
+    font-size:1.4rem;
+  }
+
+  .titlebox p{
+    margin:0;
+    color:var(--muted);
+    font-size:.95rem;
+  }
+
+  .stats{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+  }
+
+  .stat{
+    background:rgba(31,41,55,.95);
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:10px 14px;
+    min-width:120px;
+    text-align:center;
+  }
+
+  .stat .label{
+    display:block;
+    font-size:.8rem;
+    color:var(--muted);
+    margin-bottom:4px;
+  }
+
+  .stat .value{
+    font-size:1.2rem;
+    font-weight:bold;
+  }
+
+  .battlefield{
+    position:relative;
+    background:linear-gradient(180deg,#334155 0%, #475569 18%, #3f5d34 18%, #35572d 100%);
+    border:2px solid var(--line);
+    border-radius:18px;
+    overflow:hidden;
+    min-height:420px;
+  }
+
+  .skyline{
+    height:70px;
+    background:linear-gradient(180deg,#1e3a8a,#334155);
+    border-bottom:2px solid rgba(255,255,255,.08);
+  }
+
+  .lane{
+    position:relative;
+    height:300px;
+    background:
+      linear-gradient(to right, rgba(255,255,255,.05) 1px, transparent 1px) 0 0 / 80px 100%,
+      linear-gradient(180deg, rgba(255,255,255,.04), rgba(0,0,0,.08));
+  }
+
+  .groundline{
+    position:absolute;
+    bottom:74px;
+    left:0;
+    width:100%;
+    height:3px;
+    background:rgba(0,0,0,.25);
+  }
+
+  .gate{
+    position:absolute;
+    right:12px;
+    bottom:86px;
+    width:90px;
+    height:120px;
+    border:3px solid #78350f;
+    background:linear-gradient(180deg,#92400e,#5b3414);
+    border-radius:12px 12px 0 0;
+    box-shadow:0 0 20px rgba(0,0,0,.25);
+  }
+
+  .gate:before{
+    content:"KEEP";
+    position:absolute;
+    top:10px;
+    width:100%;
+    text-align:center;
+    font-weight:bold;
+    letter-spacing:1px;
+    color:#fde68a;
+    font-size:.95rem;
+  }
+
+  .tower{
+    position:absolute;
+    bottom:86px;
+    width:64px;
+    height:110px;
+    border:2px solid #d1d5db;
+    background:linear-gradient(180deg,#6b7280,#374151);
+    border-radius:10px 10px 0 0;
+    text-align:center;
+    box-shadow:0 0 12px rgba(0,0,0,.2);
+  }
+
+  .tower .tower-name{
+    position:absolute;
+    top:8px;
+    left:50%;
+    transform:translateX(-50%);
+    width:90%;
+    font-size:.7rem;
+    font-weight:bold;
+    color:#f8fafc;
+  }
+
+  .tower .charge{
+    position:absolute;
+    bottom:8px;
+    left:50%;
+    transform:translateX(-50%);
+    width:80%;
+    height:10px;
+    background:#111827;
+    border:1px solid #94a3b8;
+    border-radius:999px;
+    overflow:hidden;
+  }
+
+  .tower .charge-fill{
+    height:100%;
+    width:0%;
+    background:var(--accent);
+    transition:width .2s ease;
+  }
+
+  .tower.t1{ left:180px; }
+  .tower.t2{ left:340px; }
+  .tower.t3{ left:500px; }
+
+  .enemy{
+    position:absolute;
+    bottom:96px;
+    width:40px;
+    height:40px;
+    border-radius:50%;
+    background:radial-gradient(circle at 30% 30%, #fca5a5, #b91c1c 65%);
+    border:2px solid #7f1d1d;
+    box-shadow:0 0 10px rgba(0,0,0,.35);
+  }
+
+  .enemy .hpbar{
+    position:absolute;
+    top:-10px;
+    left:50%;
+    transform:translateX(-50%);
+    width:40px;
+    height:6px;
+    background:#111827;
+    border:1px solid #94a3b8;
+    border-radius:999px;
+    overflow:hidden;
+  }
+
+  .enemy .hpfill{
+    height:100%;
+    width:100%;
+    background:var(--good);
+  }
+
+  .projectile{
+    position:absolute;
+    width:14px;
+    height:14px;
+    border-radius:50%;
+    background:#fde68a;
+    box-shadow:0 0 12px rgba(253,230,138,.9);
+    pointer-events:none;
+  }
+
+  .bottompanel{
+    display:grid;
+    grid-template-columns:1.2fr .9fr;
+    gap:16px;
+    margin-top:16px;
+  }
+
+  .panel{
+    background:rgba(15,23,42,.94);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:16px;
+  }
+
+  .panel h2{
+    margin:0 0 10px 0;
+    font-size:1.05rem;
+  }
+
+  .panel p{
+    margin:0 0 10px 0;
+    color:var(--muted);
+    line-height:1.45;
+  }
+
+  .controls{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    margin-top:14px;
+  }
+
+  button{
+    border:none;
+    border-radius:12px;
+    padding:12px 16px;
+    font-weight:bold;
+    cursor:pointer;
+    background:#e5e7eb;
+    color:#111827;
+  }
+
+  button:hover{ filter:brightness(.95); }
+  button.primary{ background:var(--accent); }
+  button.secondary{ background:#cbd5e1; }
+
+  .log{
+    height:180px;
+    overflow:auto;
+    background:#020617;
+    border:1px solid #1e293b;
+    border-radius:12px;
+    padding:10px;
+    font-size:.92rem;
+  }
+
+  .log-entry{
+    margin-bottom:8px;
+    color:#e2e8f0;
+  }
+
+  .log-entry.good{ color:#86efac; }
+  .log-entry.bad{ color:#fca5a5; }
+  .log-entry.note{ color:#93c5fd; }
+
+  .overlay{
+    position:absolute;
+    inset:0;
+    background:rgba(2,6,23,.82);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    z-index:30;
+  }
+
+  .overlay.active{ display:flex; }
+
+  .question-card{
+    width:min(700px, 95%);
+    background:#0f172a;
+    border:1px solid #334155;
+    border-radius:18px;
+    padding:22px;
+    box-shadow:0 0 30px rgba(0,0,0,.35);
+  }
+
+  .question-card h3{
+    margin:0 0 10px 0;
+    font-size:1.2rem;
+  }
+
+  .question-card .tag{
+    display:inline-block;
+    margin-bottom:12px;
+    padding:6px 10px;
+    border-radius:999px;
+    background:#1e293b;
+    color:#cbd5e1;
+    font-size:.82rem;
+  }
+
+  .question-card .qtext{
+    font-size:1.05rem;
+    line-height:1.5;
+    margin-bottom:18px;
+  }
+
+  .answers{
+    display:grid;
+    gap:10px;
+  }
+
+  .answer-btn{
+    text-align:left;
+    background:#1e293b;
+    color:#f8fafc;
+    border:1px solid #475569;
+  }
+
+  .resultbox{
+    margin-top:14px;
+    padding:12px;
+    border-radius:12px;
+    display:none;
+    font-weight:bold;
+  }
+
+  .resultbox.good{
+    display:block;
+    background:rgba(34,197,94,.15);
+    border:1px solid rgba(34,197,94,.45);
+    color:#bbf7d0;
+  }
+
+  .resultbox.bad{
+    display:block;
+    background:rgba(239,68,68,.15);
+    border:1px solid rgba(239,68,68,.45);
+    color:#fecaca;
+  }
+
+  .wave-banner{
+    position:absolute;
+    top:84px;
+    left:50%;
+    transform:translateX(-50%);
+    background:rgba(15,23,42,.9);
+    border:1px solid #475569;
+    padding:10px 18px;
+    border-radius:999px;
+    z-index:10;
+    font-weight:bold;
+    opacity:0;
+    transition:opacity .25s ease;
+    pointer-events:none;
+  }
+
+  .wave-banner.show{ opacity:1; }
+
+  @media (max-width: 900px){
+    .bottompanel{
+      grid-template-columns:1fr;
+    }
+    .tower.t1{ left:80px; }
+    .tower.t2{ left:220px; }
+    .tower.t3{ left:360px; }
+  }
+
+  @media (max-width: 650px){
+    .battlefield{ min-height:460px; }
+    .lane{ height:320px; }
+    .tower.t1{ left:30px; }
+    .tower.t2{ left:145px; }
+    .tower.t3{ left:260px; }
+    .gate{ width:72px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="titlebox">
+      <h1>Prototype: Consumer Choice Defense</h1>
+      <p>Answer questions to power your defenses and stop the advancing army.</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><span class="label">Gate Health</span><span class="value" id="gateHealthStat">10</span></div>
+      <div class="stat"><span class="label">Wave</span><span class="value" id="waveStat">0 / 3</span></div>
+      <div class="stat"><span class="label">Enemies Left</span><span class="value" id="enemyCountStat">0</span></div>
+      <div class="stat"><span class="label">Accuracy</span><span class="value" id="accuracyStat">0%</span></div>
+    </div>
+  </div>
+
+  <div class="battlefield">
+    <div class="skyline"></div>
+    <div class="wave-banner" id="waveBanner">Wave 1</div>
+
+    <div class="lane" id="lane">
+      <div class="groundline"></div>
+
+      <div class="tower t1">
+        <div class="tower-name">Preference Tower</div>
+        <div class="charge"><div class="charge-fill" id="charge1"></div></div>
+      </div>
+
+      <div class="tower t2">
+        <div class="tower-name">Budget Tower</div>
+        <div class="charge"><div class="charge-fill" id="charge2"></div></div>
+      </div>
+
+      <div class="tower t3">
+        <div class="tower-name">Utility Tower</div>
+        <div class="charge"><div class="charge-fill" id="charge3"></div></div>
+      </div>
+
+      <div class="gate"></div>
+    </div>
+
+    <div class="overlay" id="questionOverlay">
+      <div class="question-card">
+        <h3 id="questionTitle">Question</h3>
+        <div class="tag" id="questionTag">Tag</div>
+        <div class="qtext" id="questionText"></div>
+        <div class="answers" id="answersBox"></div>
+        <div class="resultbox" id="resultBox"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bottompanel">
+    <div class="panel">
+      <h2>Battle Log</h2>
+      <div class="log" id="logBox"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Prototype Notes</h2>
+      <p>This version keeps the map fixed and the defenses simple. Students answer questions. Correct answers charge all towers and fire at the nearest enemy. Wrong answers damage the gate.</p>
+      <p>That means the learning loop is front and center instead of being buried under tower placement chaos.</p>
+      <div class="controls">
+        <button class="primary" id="startBtn">Start Prototype</button>
+        <button class="secondary" id="resetBtn">Reset</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* =========================================================
+   SAFE TO EDIT: CHAPTER / LEVEL INFO
+   ========================================================= */
+const GAME_CONFIG = {
+  chapterTitle: "Consumer Choice Defense",
+  levelTitle: "The Budget Gate",
+  totalWaves: 3,
+  gateHealth: 10,
+  enemySpeed: 0.45,
+  timeBetweenSpawns: 2200,
+  questionInterval: 4500,
+  projectileSpeed: 8
+};
+
+/* =========================================================
+   SAFE TO EDIT: WAVE DESIGN
+   hp = enemy health
+   count = number of enemies in that wave
+   ========================================================= */
+const WAVES = [
+  { count: 4, hp: 2, speedMod: 1.0 },
+  { count: 5, hp: 3, speedMod: 1.1 },
+  { count: 1, hp: 8, speedMod: 0.8, boss: true }
+];
+
+/* =========================================================
+   SAFE TO EDIT: QUESTION BANK
+   correct = index of correct answer in answers array
+   feedback = what appears after answer
+   tag = concept grouping for future adaptation
+   ========================================================= */
+const QUESTIONS = [
+  {
+    tag: "Preferences",
+    title: "Question 1",
+    text: "If a consumer prefers bundle A to bundle B, and bundle B to bundle C, then consistent preferences imply the consumer should prefer:",
+    answers: ["C to A", "A to C", "Only B to C", "None of the above"],
+    correct: 1,
+    feedback: "That’s transitivity. If preferences are consistent, A beats C too."
+  },
+  {
+    tag: "Budget Constraint",
+    title: "Question 2",
+    text: "When the price of one good rises and income stays the same, the consumer’s budget constraint usually:",
+    answers: ["Shifts outward", "Does not change", "Rotates inward", "Becomes flatter for all goods"],
+    correct: 2,
+    feedback: "Right. A price change for one good rotates the budget line inward around the other intercept."
+  },
+  {
+    tag: "Utility Maximization",
+    title: "Question 3",
+    text: "At the consumer optimum, the decision rule is best described as:",
+    answers: ["Buy only the cheaper good", "Equal total utility across goods", "Equal marginal utility per dollar across goods", "Spend half of income on each good"],
+    correct: 2,
+    feedback: "That’s the core rule. Consumers equalize marginal utility per dollar when possible."
+  },
+  {
+    tag: "Preferences",
+    title: "Question 4",
+    text: "Indifference curves that cross each other would suggest:",
+    answers: ["Consistent preferences", "Higher income", "A violation of rational preference ordering", "Perfect competition"],
+    correct: 2,
+    feedback: "Correct. Crossing indifference curves breaks consistent ranking."
+  },
+  {
+    tag: "Budget Constraint",
+    title: "Question 5",
+    text: "An increase in income, holding prices fixed, causes the budget constraint to:",
+    answers: ["Shift outward in a parallel way", "Rotate inward", "Rotate outward around one intercept", "Disappear"],
+    correct: 0,
+    feedback: "Yep. Same slope, farther out."
+  },
+  {
+    tag: "Utility Maximization",
+    title: "Question 6",
+    text: "If a consumer is not maximizing utility, the most likely issue is that:",
+    answers: ["The last dollar spent on each good gives different marginal utility", "All goods have the same price", "Income is zero", "Preferences are complete"],
+    correct: 0,
+    feedback: "Exactly. If marginal utility per dollar differs, the consumer can reallocate spending."
+  }
+];
+
+/* =========================================================
+   ENGINE STATE
+   ========================================================= */
+let state = {
+  running: false,
+  paused: false,
+  gameOver: false,
+  gateHealth: GAME_CONFIG.gateHealth,
+  waveIndex: 0,
+  enemies: [],
+  projectiles: [],
+  enemyId: 0,
+  shotsFired: 0,
+  totalAnswered: 0,
+  totalCorrect: 0,
+  lastFrame: 0,
+  spawnTimer: 0,
+  questionTimer: 0,
+  enemiesSpawnedInWave: 0,
+  questionOpen: false
+};
+
+const lane = document.getElementById("lane");
+const questionOverlay = document.getElementById("questionOverlay");
+const questionTitle = document.getElementById("questionTitle");
+const questionTag = document.getElementById("questionTag");
+const questionText = document.getElementById("questionText");
+const answersBox = document.getElementById("answersBox");
+const resultBox = document.getElementById("resultBox");
+const logBox = document.getElementById("logBox");
+const waveBanner = document.getElementById("waveBanner");
+
+const gateHealthStat = document.getElementById("gateHealthStat");
+const waveStat = document.getElementById("waveStat");
+const enemyCountStat = document.getElementById("enemyCountStat");
+const accuracyStat = document.getElementById("accuracyStat");
+
+const chargeEls = [
+  document.getElementById("charge1"),
+  document.getElementById("charge2"),
+  document.getElementById("charge3")
+];
+
+document.getElementById("startBtn").addEventListener("click", startGame);
+document.getElementById("resetBtn").addEventListener("click", resetGame);
+
+function logMessage(text, cls = "") {
+  const div = document.createElement("div");
+  div.className = `log-entry ${cls}`;
+  div.textContent = text;
+  logBox.prepend(div);
+}
+
+function updateStats() {
+  gateHealthStat.textContent = state.gateHealth;
+  waveStat.textContent = `${Math.min(state.waveIndex + (state.running ? 1 : 0), GAME_CONFIG.totalWaves)} / ${GAME_CONFIG.totalWaves}`;
+  enemyCountStat.textContent = state.enemies.length;
+  const acc = state.totalAnswered ? Math.round((state.totalCorrect / state.totalAnswered) * 100) : 0;
+  accuracyStat.textContent = `${acc}%`;
+}
+
+function showWaveBanner(text) {
+  waveBanner.textContent = text;
+  waveBanner.classList.add("show");
+  setTimeout(() => waveBanner.classList.remove("show"), 1400);
+}
+
+function startGame() {
+  if (state.running) return;
+  resetGame(true);
+  state.running = true;
+  state.lastFrame = performance.now();
+  state.waveIndex = 0;
+  state.enemiesSpawnedInWave = 0;
+  showWaveBanner("Wave 1");
+  logMessage("The siege begins. Hold the line.", "note");
+  updateStats();
+  requestAnimationFrame(gameLoop);
+}
+
+function resetGame(silent = false) {
+  state.running = false;
+  state.paused = false;
+  state.gameOver = false;
+  state.gateHealth = GAME_CONFIG.gateHealth;
+  state.waveIndex = 0;
+  state.enemies = [];
+  state.projectiles = [];
+  state.enemyId = 0;
+  state.shotsFired = 0;
+  state.totalAnswered = 0;
+  state.totalCorrect = 0;
+  state.lastFrame = 0;
+  state.spawnTimer = 0;
+  state.questionTimer = 0;
+  state.enemiesSpawnedInWave = 0;
+  state.questionOpen = false;
+  questionOverlay.classList.remove("active");
+  resultBox.className = "resultbox";
+  resultBox.textContent = "";
+  document.querySelectorAll(".enemy, .projectile").forEach(el => el.remove());
+  chargeEls.forEach(el => el.style.width = "0%");
+  if (!silent) logBox.innerHTML = "";
+  updateStats();
+}
+
+function spawnEnemy() {
+  const wave = WAVES[state.waveIndex];
+  const enemy = {
+    id: ++state.enemyId,
+    x: 10,
+    y: 210,
+    hp: wave.hp,
+    maxHp: wave.hp,
+    speed: GAME_CONFIG.enemySpeed * wave.speedMod,
+    boss: !!wave.boss,
+    element: null,
+    hpFill: null
+  };
+
+  const el = document.createElement("div");
+  el.className = "enemy";
+  if (enemy.boss) {
+    el.style.width = "58px";
+    el.style.height = "58px";
+    el.style.bottom = "86px";
+    el.style.background = "radial-gradient(circle at 30% 30%, #fcd34d, #92400e 70%)";
+    el.style.border = "2px solid #f59e0b";
+  }
+  const hpbar = document.createElement("div");
+  hpbar.className = "hpbar";
+  const hpfill = document.createElement("div");
+  hpfill.className = "hpfill";
+  hpbar.appendChild(hpfill);
+  el.appendChild(hpbar);
+
+  enemy.element = el;
+  enemy.hpFill = hpfill;
+
+  lane.appendChild(el);
+  state.enemies.push(enemy);
+
+  if (enemy.boss) {
+    logMessage("Boss wave. A siege brute enters the field.", "bad");
+  } else {
+    logMessage("Enemy unit advancing.", "note");
+  }
+  updateEnemyElement(enemy);
+  updateStats();
+}
+
+function updateEnemyElement(enemy) {
+  enemy.element.style.left = `${enemy.x}px`;
+  enemy.hpFill.style.width = `${Math.max(0, (enemy.hp / enemy.maxHp) * 100)}%`;
+}
+
+function openQuestion() {
+  if (state.questionOpen || state.gameOver) return;
+  state.paused = true;
+  state.questionOpen = true;
+
+  const q = QUESTIONS[Math.floor(Math.random() * QUESTIONS.length)];
+  questionTitle.textContent = q.title;
+  questionTag.textContent = q.tag;
+  questionText.textContent = q.text;
+  answersBox.innerHTML = "";
+  resultBox.className = "resultbox";
+  resultBox.textContent = "";
+
+  q.answers.forEach((answer, index) => {
+    const btn = document.createElement("button");
+    btn.className = "answer-btn";
+    btn.textContent = answer;
+    btn.addEventListener("click", () => handleAnswer(q, index));
+    answersBox.appendChild(btn);
+  });
+
+  questionOverlay.classList.add("active");
+}
+
+function handleAnswer(question, selectedIndex) {
+  if (!state.questionOpen) return;
+
+  state.totalAnswered++;
+  const correct = selectedIndex === question.correct;
+
+  if (correct) {
+    state.totalCorrect++;
+    resultBox.className = "resultbox good";
+    resultBox.textContent = "Correct. Towers fire. " + question.feedback;
+    logMessage(`Correct: ${question.tag} answer powers the defenses.`, "good");
+    fireTowerVolley();
+  } else {
+    resultBox.className = "resultbox bad";
+    resultBox.textContent = "Wrong. The gate takes damage. " + question.feedback;
+    state.gateHealth -= 1;
+    logMessage(`Wrong: ${question.tag} slip. The gate is hit for 1 damage.`, "bad");
+    if (state.gateHealth <= 0) {
+      state.gateHealth = 0;
+      updateStats();
+      setTimeout(() => endGame(false), 700);
+    }
+  }
+
+  updateStats();
+
+  setTimeout(() => {
+    if (!state.gameOver) {
+      questionOverlay.classList.remove("active");
+      state.questionOpen = false;
+      state.paused = false;
+    }
+  }, 1100);
+}
+
+function fireTowerVolley() {
+  const towers = [
+    { x: 212, y: 245 },
+    { x: 372, y: 245 },
+    { x: 532, y: 245 }
+  ];
+
+  chargeEls.forEach(el => {
+    el.style.width = "100%";
+    setTimeout(() => el.style.width = "0%", 250);
+  });
+
+  towers.forEach((tower, idx) => {
+    const target = getNearestEnemy();
+    if (!target) return;
+
+    const proj = document.createElement("div");
+    proj.className = "projectile";
+    proj.style.left = `${tower.x}px`;
+    proj.style.top = `${tower.y}px`;
+    lane.appendChild(proj);
+
+    state.projectiles.push({
+      x: tower.x,
+      y: tower.y,
+      speed: GAME_CONFIG.projectileSpeed,
+      targetId: target.id,
+      damage: 1,
+      element: proj
+    });
+  });
+}
+
+function getNearestEnemy() {
+  if (!state.enemies.length) return null;
+  return [...state.enemies].sort((a, b) => b.x - a.x)[0];
+}
+
+function updateProjectiles() {
+  state.projectiles = state.projectiles.filter(proj => {
+    const target = state.enemies.find(e => e.id === proj.targetId);
+    if (!target) {
+      proj.element.remove();
+      return false;
+    }
+
+    const tx = target.x + (target.boss ? 25 : 16);
+    const ty = 220;
+    const dx = tx - proj.x;
+    const dy = ty - proj.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist < proj.speed + 2) {
+      target.hp -= proj.damage;
+      if (target.hp <= 0) {
+        destroyEnemy(target);
+      } else {
+        updateEnemyElement(target);
+      }
+      proj.element.remove();
+      return false;
+    }
+
+    proj.x += (dx / dist) * proj.speed;
+    proj.y += (dy / dist) * proj.speed;
+    proj.element.style.left = `${proj.x}px`;
+    proj.element.style.top = `${proj.y}px`;
+    return true;
+  });
+}
+
+function destroyEnemy(enemy) {
+  enemy.element.remove();
+  state.enemies = state.enemies.filter(e => e.id !== enemy.id);
+  logMessage(enemy.boss ? "Boss unit destroyed." : "Enemy destroyed.", "good");
+  updateStats();
+
+  if (state.waveIndex >= WAVES.length - 1 && state.enemies.length === 0 && state.enemiesSpawnedInWave >= WAVES[state.waveIndex].count) {
+    endGame(true);
+  }
+}
+
+function advanceEnemies(delta) {
+  const gateX = lane.clientWidth - 100;
+
+  for (let enemy of [...state.enemies]) {
+    enemy.x += enemy.speed * delta * 0.06;
+    updateEnemyElement(enemy);
+
+    if (enemy.x >= gateX) {
+      enemy.element.remove();
+      state.enemies = state.enemies.filter(e => e.id !== enemy.id);
+      state.gateHealth -= enemy.boss ? 3 : 1;
+      logMessage(enemy.boss ? "Boss crashes into the gate for 3 damage." : "Enemy reaches the gate for 1 damage.", "bad");
+      updateStats();
+
+      if (state.gateHealth <= 0) {
+        state.gateHealth = 0;
+        endGame(false);
+        return;
+      }
+    }
+  }
+}
+
+function handleWaveSpawning(delta) {
+  const wave = WAVES[state.waveIndex];
+  if (!wave) return;
+
+  state.spawnTimer += delta;
+
+  if (state.enemiesSpawnedInWave < wave.count && state.spawnTimer >= GAME_CONFIG.timeBetweenSpawns) {
+    state.spawnTimer = 0;
+    spawnEnemy();
+    state.enemiesSpawnedInWave++;
+    updateStats();
+  }
+
+  if (state.enemiesSpawnedInWave >= wave.count && state.enemies.length === 0) {
+    if (state.waveIndex < WAVES.length - 1) {
+      state.waveIndex++;
+      state.enemiesSpawnedInWave = 0;
+      state.spawnTimer = 0;
+      showWaveBanner(`Wave ${state.waveIndex + 1}`);
+      logMessage(`Wave ${state.waveIndex + 1} begins.`, "note");
+      updateStats();
+    }
+  }
+}
+
+function handleQuestionTimer(delta) {
+  state.questionTimer += delta;
+  if (state.questionTimer >= GAME_CONFIG.questionInterval) {
+    state.questionTimer = 0;
+    openQuestion();
+  }
+}
+
+function endGame(victory) {
+  if (state.gameOver) return;
+  state.running = false;
+  state.gameOver = true;
+  questionOverlay.classList.add("active");
+  state.questionOpen = true;
+
+  const acc = state.totalAnswered ? Math.round((state.totalCorrect / state.totalAnswered) * 100) : 0;
+
+  questionTitle.textContent = victory ? "Victory" : "Defeat";
+  questionTag.textContent = victory ? "Prototype Complete" : "Gate Fallen";
+  questionText.textContent = victory
+    ? `You held the line. Accuracy: ${acc}%. This proves the loop works: answer questions, power towers, stop the siege.`
+    : `The gate is down. Accuracy: ${acc}%. That’s useful too. Failure state works, and now you can tune pacing, damage, and question frequency.`;
+  answersBox.innerHTML = `<button class="primary" onclick="startGame()">Run Again</button>`;
+  resultBox.className = "resultbox " + (victory ? "good" : "bad");
+  resultBox.textContent = victory
+    ? "Prototype success. Now refine the feel."
+    : "Prototype failed. Good. That means it has stakes.";
+  logMessage(victory ? "Defense successful." : "The keep has fallen.", victory ? "good" : "bad");
+  updateStats();
+}
+
+function gameLoop(timestamp) {
+  if (!state.running) return;
+
+  const delta = timestamp - state.lastFrame;
+  state.lastFrame = timestamp;
+
+  if (!state.paused && !state.gameOver) {
+    handleWaveSpawning(delta);
+    handleQuestionTimer(delta);
+    advanceEnemies(delta);
+    updateProjectiles();
+    updateStats();
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+updateStats();
+logMessage("Prototype ready. Hit Start Prototype and see if the loop has teeth.", "note");
+</script>
+</body>
+</html>
