@@ -728,7 +728,15 @@ const campaign = {
   gold: STARTING_GOLD,
   towers: [],
   nextTowerId: 1,
-  conceptMemory: {}
+  conceptMemory: {},
+
+  masteryPoints: 0,
+  meta: {
+    singleDamageBonus: 0,
+    aoeSplashBonus: 0,
+    slowDurationBonus: 0,
+    startingGoldBonus: 0
+  }
 };
 
 const TOWER_TYPES = {
@@ -1206,7 +1214,7 @@ function askUpgradeQuestion(onSuccess, onFailure, titleText = "Upgrade Question"
   questionTitle.textContent = titleText;
   questionTag.textContent = q.tag;
   questionText.textContent = q.text;
-  answersBox.innerHTML = "";
+  answersBox.innerHTML = "${renderMetaUpgradeHTML()}";
   resultBox.className = "resultbox";
   resultBox.textContent = "";
 
@@ -1345,7 +1353,7 @@ function getTowerStats(tower) {
     return {
       ...base,
       level,
-      damage: base.baseDamage + ((level - 1) * 0.5),
+      damage: base.baseDamage + campaign.meta.singleDamageBonus + ((level - 1) * 0.5),
       bonusVsTank: base.bonusVsTank + ((level - 1) * 0.5),
       fireCooldown: Math.max(500, base.fireCooldown - ((level - 1) * 50))
     };
@@ -1356,7 +1364,7 @@ function getTowerStats(tower) {
       ...base,
       level,
       damage: base.baseDamage + ((level - 1) * 0.75),
-      splashRadius: base.splashRadius + ((level - 1) * 8),
+      splashRadius: base.splashRadius + campaign.meta.aoeSplashBonus + ((level - 1) * 8),
       fireCooldown: Math.max(700, base.fireCooldown - ((level - 1) * 40))
     };
   }
@@ -1366,9 +1374,13 @@ function getTowerStats(tower) {
     level,
     damage: base.baseDamage,
     slowAmount: Math.min(0.5, base.slowAmount + ((level - 1) * 0.05)),
-    slowDuration: base.slowDuration + ((level - 1) * 300),
+    slowDuration: base.slowDuration + campaign.meta.slowDurationBonus + ((level - 1) * 300),
     fireCooldown: Math.max(500, base.fireCooldown - ((level - 1) * 40))
   };
+}
+
+function getWorldStartingGold() {
+  return STARTING_GOLD + campaign.meta.startingGoldBonus;
 }
   
 function getTowerTarget(tower) {
@@ -1789,6 +1801,7 @@ function showTowerGuide() {
     <span class="pill">Gold: ${campaign.gold}</span>
     <span class="pill">Placed Towers: ${campaign.towers.length}</span>
     <span class="pill">Open Slots: ${getCurrentWorldLayout().slotCount - campaign.towers.length}</span>
+    <span class="pill">Mastery Points: ${campaign.masteryPoints}</span>
   </div>
     </div>
     <div class="active-upgrades">
@@ -1885,7 +1898,7 @@ function startFromMap(levelIndex) {
   resetLevelState();
 
   campaign.towers = [];
-  campaign.gold = STARTING_GOLD;
+  campaign.gold = getWorldStartingGold();
   state.starterBuildsRemaining = 3;
   state.selectedBuildType = null;
   state.setupMode = true;
@@ -1993,6 +2006,12 @@ function beginBattleAfterSetup() {
   logMessage(`Starting ${state.currentLevel.name}. Opening towers placed.`, "note");
   requestAnimationFrame(gameLoop);
 }
+
+function awardMasteryPoints(stars) {
+  const earned = stars >= 3 ? 2 : 1;
+  campaign.masteryPoints += earned;
+  return earned;
+}
   
 function completeLevel() {
   if (state.gameOver) return;
@@ -2002,6 +2021,7 @@ function completeLevel() {
   questionOverlay.classList.add("active");
 
   const result = calculateStars();
+  const earnedMastery = awardMasteryPoints(result.stars);
   const levelId = state.currentLevel.id;
   campaign.bestStars[levelId] = Math.max(campaign.bestStars[levelId] || 0, result.stars);
 
@@ -2103,7 +2123,7 @@ function startNextLevel() {
 function resetCampaign() {
   campaign.unlockedLevel = 1;
   campaign.bestStars = {};
-  campaign.gold = STARTING_GOLD;
+  campaign.gold = getWorldStartingGold();
   campaign.towers = [];
   campaign.nextTowerId = 1;
   campaign.conceptMemory = {};
@@ -2115,6 +2135,83 @@ function resetCampaign() {
   logMessage("Campaign reset. Gold wiped. Towers cleared. Chapter memory wiped.", "note");
 }
 
+function renderMetaUpgradeHTML() {
+  const upgrades = [
+    {
+      key: "singleDamageBonus",
+      name: "Precision Training",
+      desc: `Preference Towers +0.2 damage`,
+      cost: 1,
+      value: campaign.meta.singleDamageBonus
+    },
+    {
+      key: "aoeSplashBonus",
+      name: "Blast Theory",
+      desc: `Budget Towers +4 splash radius`,
+      cost: 1,
+      value: campaign.meta.aoeSplashBonus
+    },
+    {
+      key: "slowDurationBonus",
+      name: "Control Theory",
+      desc: `Utility Towers +150ms slow duration`,
+      cost: 1,
+      value: campaign.meta.slowDurationBonus
+    },
+    {
+      key: "startingGoldBonus",
+      name: "Field Logistics",
+      desc: `Start worlds with +2 gold`,
+      cost: 1,
+      value: campaign.meta.startingGoldBonus
+    }
+  ];
+
+  return `
+    <div class="active-upgrades">
+      <strong>Archive Mastery</strong>
+      <div class="pill-list" style="margin-bottom:10px;">
+        <span class="pill">Mastery Points: ${campaign.masteryPoints}</span>
+      </div>
+      <div class="upgrade-grid">
+        ${upgrades.map(upgrade => `
+          <div class="upgrade-card">
+            <h4>${upgrade.name}</h4>
+            <p>${upgrade.desc}</p>
+            <div class="shop-meta">Current value: ${upgrade.value}</div>
+            <button
+              class="${campaign.masteryPoints >= upgrade.cost ? "primary" : "secondary"}"
+              ${campaign.masteryPoints >= upgrade.cost ? "" : "disabled"}
+              onclick="buyMetaUpgrade('${upgrade.key}')"
+            >
+              Spend ${upgrade.cost} Point
+            </button>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function buyMetaUpgrade(key) {
+  if (campaign.masteryPoints < 1) return;
+
+  if (key === "singleDamageBonus") {
+    campaign.meta.singleDamageBonus += 0.2;
+  } else if (key === "aoeSplashBonus") {
+    campaign.meta.aoeSplashBonus += 4;
+  } else if (key === "slowDurationBonus") {
+    campaign.meta.slowDurationBonus += 150;
+  } else if (key === "startingGoldBonus") {
+    campaign.meta.startingGoldBonus += 2;
+  } else {
+    return;
+  }
+
+  campaign.masteryPoints -= 1;
+  showLevelMap();
+}
+  
 function gameLoop(timestamp) {
   if (!state.running) return;
   const delta = timestamp - state.lastFrame;
@@ -2132,6 +2229,15 @@ function gameLoop(timestamp) {
   requestAnimationFrame(gameLoop);
 }
 
+function resetRunForNewWorld() {
+  campaign.gold = getWorldStartingGold();
+  campaign.towers = [];
+  campaign.nextTowerId = 1;
+  state.starterBuildsRemaining = 3;
+  state.selectedBuildType = null;
+  state.setupMode = true;
+}
+
 window.startFromMap = startFromMap;
 window.replayCurrentLevel = replayCurrentLevel;
 window.startNextLevel = startNextLevel;
@@ -2142,6 +2248,7 @@ window.closeOverlayResume = closeOverlayResume;
 window.selectBuildType = selectBuildType;
 window.placeStarterTower = placeStarterTower;
 window.beginBattleAfterSetup = beginBattleAfterSetup;
+window.buyMetaUpgrade = buyMetaUpgrade;
 
 loadLevel(0);
 showLevelMap();
