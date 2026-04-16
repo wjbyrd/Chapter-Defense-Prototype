@@ -726,7 +726,7 @@ const ENEMY_TYPES = {
     label: "Grunt",
     hp: 3,
     speedMult: 1.0,
-    gold: 3,
+    gold: 1,
     breachDps: 0.8,
     size: 40,
     fill: "radial-gradient(circle at 30% 30%, #fca5a5, #b91c1c 65%)",
@@ -736,7 +736,7 @@ const ENEMY_TYPES = {
     label: "Sprinter",
     hp: 2,
     speedMult: 1.8,
-    gold: 4,
+    gold: 1,
     breachDps: 1.1,
     size: 34,
     fill: "radial-gradient(circle at 30% 30%, #93c5fd, #1d4ed8 68%)",
@@ -746,7 +746,7 @@ const ENEMY_TYPES = {
     label: "Tank",
     hp: 8,
     speedMult: 0.7,
-    gold: 7,
+    gold: 2,
     breachDps: 2.4,
     size: 56,
     fill: "radial-gradient(circle at 30% 30%, #fde68a, #b45309 70%)",
@@ -755,40 +755,9 @@ const ENEMY_TYPES = {
 };
 
 const BASE_TOWERS = [
-  {
-    key: "single",
-    name: "Preference Tower",
-    x: 212,
-    y: 245,
-    role: "single",
-    baseDamage: 3,
-    bonusVsTank: 2,
-    fireCooldown: 950,
-    upgradeCostBase: 9
-  },
-  {
-    key: "aoe",
-    name: "Budget Tower",
-    x: 372,
-    y: 245,
-    role: "aoe",
-    baseDamage: 1,
-    splashRadius: 75,
-    fireCooldown: 1250,
-    upgradeCostBase: 9
-  },
-  {
-    key: "slow",
-    name: "Utility Tower",
-    x: 532,
-    y: 245,
-    role: "slow",
-    baseDamage: 1,
-    slowAmount: 0.18,
-    slowDuration: 2600,
-    fireCooldown: 900,
-    upgradeCostBase: 9
-  }
+  { key: "single", name: "Preference Tower", x: 212, y: 245, baseDamage: 3, bonusVsBoss: 2, cooldown: 1400, upgradeType: "Boss damage", upgradeCostBase: 14 },
+  { key: "aoe", name: "Budget Tower", x: 372, y: 245, baseDamage: 1, splashRadius: 70, cooldown: 1800, upgradeType: "Splash damage", upgradeCostBase: 14 },
+  { key: "slow", name: "Utility Tower", x: 532, y: 245, baseDamage: 0, slowAmount: 0.18, slowDuration: 2200, cooldown: 1600, upgradeType: "Slow strength", upgradeCostBase: 14 }
 ];
 
 const LEVELS = [
@@ -1031,11 +1000,11 @@ function addGold(amount) {
 function getTowerByRole(role) {
   return BASE_TOWERS.find(t => t.key === role);
 }
-
+  
 function getTowerUpgradeCost(role) {
-  const tower = getTowerByRole(role);
   const currentLevel = campaign.towerLevels[role] || 1;
-  return (tower?.upgradeCostBase || 9) + ((currentLevel - 1) * 6);
+  const tower = getTowerByRole(role);
+  return (tower?.upgradeCostBase || 14) + ((currentLevel - 1) * 8);
 }
 
 function getTowerDefinitions() {
