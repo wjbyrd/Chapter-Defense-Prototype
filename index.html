@@ -1151,9 +1151,9 @@ function handleAnswer(question, selectedIndex) {
 
 function fireTowerVolley() {
   const towers = [
-    { x: 212, y: 245 },
-    { x: 372, y: 245 },
-    { x: 532, y: 245 }
+    { name: "Preference Tower", role: "single", x: 212, y: 245, damage: 3, bonusVsBoss: 2 },
+    { name: "Budget Tower", role: "aoe", x: 372, y: 245, damage: 1, splashRadius: 70 },
+    { name: "Utility Tower", role: "slow", x: 532, y: 245, damage: 1, slowAmount: 0.2, slowDuration: 3000 }
   ];
 
   chargeEls.forEach(el => {
@@ -1165,20 +1165,63 @@ function fireTowerVolley() {
     const target = getNearestEnemy();
     if (!target) return;
 
-    const proj = document.createElement("div");
-    proj.className = "projectile";
-    proj.style.left = `${tower.x}px`;
-    proj.style.top = `${tower.y}px`;
-    lane.appendChild(proj);
+    if (tower.role === "single") {
+      spawnProjectile(
+        tower,
+        target,
+        tower.damage + campaign.upgrades.damageBonus,
+        tower.bonusVsBoss || 0,
+        0,
+        0,
+        0
+      );
+    }
 
-    state.projectiles.push({
-      x: tower.x,
-      y: tower.y,
-      speed: state.currentLevel.projectileSpeed,
-      targetId: target.id,
-      damage: 1 + campaign.upgrades.damageBonus,
-      element: proj
-    });
+    if (tower.role === "aoe") {
+      spawnProjectile(
+        tower,
+        target,
+        tower.damage + campaign.upgrades.damageBonus,
+        0,
+        tower.splashRadius || 0,
+        0,
+        0
+      );
+    }
+
+    if (tower.role === "slow") {
+      spawnProjectile(
+        tower,
+        target,
+        tower.damage,
+        0,
+        0,
+        tower.slowAmount || 0,
+        tower.slowDuration || 0
+      );
+    }
+  });
+}
+
+function spawnProjectile(tower, target, damage, bonusVsBoss = 0, splashRadius = 0, slowAmount = 0, slowDuration = 0) {
+  const proj = document.createElement("div");
+  proj.className = "projectile";
+  proj.style.left = `${tower.x}px`;
+  proj.style.top = `${tower.y}px`;
+  lane.appendChild(proj);
+
+  state.projectiles.push({
+    x: tower.x,
+    y: tower.y,
+    speed: state.currentLevel.projectileSpeed,
+    targetId: target.id,
+    damage,
+    element: proj,
+    role: tower.role,
+    bonusVsBoss,
+    splashRadius,
+    slowAmount,
+    slowDuration
   });
 }
 
@@ -1189,19 +1232,25 @@ function getNearestEnemy() {
 
 function spawnEnemy() {
   const wave = state.currentLevel.waves[state.waveIndex];
+  const baseSpeed = state.currentLevel.enemySpeed * wave.speedMod;
+
   const enemy = {
     id: ++state.enemyId,
     x: 10,
     hp: wave.hp,
     maxHp: wave.hp,
-    speed: state.currentLevel.enemySpeed * wave.speedMod,
+    speed: baseSpeed,
+    originalSpeed: baseSpeed,
     boss: !!wave.boss,
     element: null,
-    hpFill: null
+    hpFill: null,
+    slowTimeout: null,
+    slowed: false
   };
 
   const el = document.createElement("div");
   el.className = "enemy";
+
   if (enemy.boss) {
     el.style.width = "58px";
     el.style.height = "58px";
@@ -1212,19 +1261,44 @@ function spawnEnemy() {
 
   const hpbar = document.createElement("div");
   hpbar.className = "hpbar";
+
   const hpfill = document.createElement("div");
   hpfill.className = "hpfill";
+
   hpbar.appendChild(hpfill);
   el.appendChild(hpbar);
 
   enemy.element = el;
   enemy.hpFill = hpfill;
+
   lane.appendChild(el);
   state.enemies.push(enemy);
 
-  logMessage(enemy.boss ? "Boss wave unit enters." : "Enemy unit advancing.", enemy.boss ? "bad" : "note");
+  logMessage(
+    enemy.boss ? "Boss wave unit enters." : "Enemy unit advancing.",
+    enemy.boss ? "bad" : "note"
+  );
+
   updateEnemyElement(enemy);
   updateStats();
+}
+
+function applySlowEffect(enemy, slowAmount, slowDuration) {
+  if (!enemy || enemy.hp <= 0) return;
+  if (enemy.slowTimeout) {
+    clearTimeout(enemy.slowTimeout);
+  }
+
+  enemy.slowed = true;
+  enemy.speed = enemy.originalSpeed * (1 - slowAmount);
+
+  enemy.slowTimeout = setTimeout(() => {
+    if (enemy && enemy.hp > 0) {
+      enemy.speed = enemy.originalSpeed;
+      enemy.slowed = false;
+      enemy.slowTimeout = null;
+    }
+  }, slowDuration);
 }
 
 function updateEnemyElement(enemy) {
@@ -1247,12 +1321,41 @@ function updateProjectiles() {
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     if (dist < proj.speed + 2) {
-      target.hp -= proj.damage;
+      let finalDamage = proj.damage;
+
+      if (proj.role === "single" && target.boss) {
+        finalDamage += proj.bonusVsBoss;
+      }
+
+      target.hp -= finalDamage;
+
+      if (proj.role === "aoe" && proj.splashRadius > 0) {
+        state.enemies.forEach(enemy => {
+          if (enemy.id === target.id) return;
+
+          const splashDist = Math.abs(enemy.x - target.x);
+          if (splashDist <= proj.splashRadius) {
+            enemy.hp -= proj.damage;
+
+            if (enemy.hp <= 0) {
+              destroyEnemy(enemy);
+            } else {
+              updateEnemyElement(enemy);
+            }
+          }
+        });
+      }
+
+      if (proj.role === "slow" && proj.slowAmount > 0) {
+        applySlowEffect(target, proj.slowAmount, proj.slowDuration);
+      }
+
       if (target.hp <= 0) {
         destroyEnemy(target);
       } else {
         updateEnemyElement(target);
       }
+
       proj.element.remove();
       return false;
     }
@@ -1265,6 +1368,26 @@ function updateProjectiles() {
   });
 }
 
+function applySlowEffect(enemy, slowAmount, slowDuration) {
+  if (!enemy || enemy.hp <= 0) return;
+
+  if (enemy.slowTimeout) {
+    clearTimeout(enemy.slowTimeout);
+  }
+
+  if (enemy.originalSpeed == null) {
+    enemy.originalSpeed = enemy.speed;
+  }
+
+  enemy.speed = enemy.originalSpeed * (1 - slowAmount);
+
+  enemy.slowTimeout = setTimeout(() => {
+    if (enemy && enemy.hp > 0) {
+      enemy.speed = enemy.originalSpeed;
+    }
+  }, slowDuration);
+}
+  
 function destroyEnemy(enemy) {
   enemy.element.remove();
   state.enemies = state.enemies.filter(e => e.id !== enemy.id);
