@@ -1214,7 +1214,7 @@ function askUpgradeQuestion(onSuccess, onFailure, titleText = "Upgrade Question"
   questionTitle.textContent = titleText;
   questionTag.textContent = q.tag;
   questionText.textContent = q.text;
-  answersBox.innerHTML = "${renderMetaUpgradeHTML()}";
+  answersBox.innerHTML = "";
   resultBox.className = "resultbox";
   resultBox.textContent = "";
 
@@ -1867,7 +1867,7 @@ function showLevelMap() {
     `;
   }).join("");
 
-  answersBox.innerHTML = `
+  answersBox.innerHTML = ${renderMetaUpgradeHTML()}
     <div class="level-list">${rows}</div>
     <div class="active-upgrades">
       <strong>Run Economy</strong>
@@ -2051,6 +2051,10 @@ function completeLevel() {
       <div class="summary-box">
         <span class="label">Gold</span>
         <span class="value">${campaign.gold}</span>
+      </div>
+      <div class="summary-box">
+       <span class="label">Mastery Earned</span>
+       <span class="value">+${earnedMastery}</span>
       </div>
     </div>
     <div class="controls">
