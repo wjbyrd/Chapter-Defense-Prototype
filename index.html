@@ -1867,24 +1867,25 @@ function showLevelMap() {
     `;
   }).join("");
 
-  answersBox.innerHTML = ${renderMetaUpgradeHTML()}
-    <div class="level-list">${rows}</div>
-    <div class="active-upgrades">
-      <strong>Run Economy</strong>
-      <div class="pill-list">
-        <span class="pill">Gold: ${campaign.gold}</span>
-      </div>
+answersBox.innerHTML = `
+  ${renderMetaUpgradeHTML()}
+  <div class="level-list">${rows}</div>
+  <div class="active-upgrades">
+    <strong>Run Economy</strong>
+    <div class="pill-list">
+      <span class="pill">Gold: ${campaign.gold}</span>
     </div>
-    <div class="active-upgrades">
-      <strong>Weak-Tag Pressure</strong>
-      ${getTagBreakdownHTML()}
-    </div>
-    ${getChapterPersistenceHTML()}
-    <div class="controls">
-      <button class="secondary" onclick="showTowerGuide()">Tower Guide</button>
-      ${canResumeRun ? `<button class="primary" onclick="closeOverlayResume()">Return to Battle</button>` : ``}
-    </div>
-  `;
+  </div>
+  <div class="active-upgrades">
+    <strong>Weak-Tag Pressure</strong>
+    ${getTagBreakdownHTML()}
+  </div>
+  ${getChapterPersistenceHTML()}
+  <div class="controls">
+    <button class="secondary" onclick="showTowerGuide()">Tower Guide</button>
+    ${canResumeRun ? `<button class="primary" onclick="closeOverlayResume()">Return to Battle</button>` : ``}
+  </div>
+`;
   resultBox.className = "resultbox";
   resultBox.textContent = "";
 }
