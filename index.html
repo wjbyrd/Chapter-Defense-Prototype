@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Chapter Defense Prototype - Level Progression</title>
+<title>Chapter Defense Prototype - Upgrades</title>
 <style>
   :root{
     --bg:#111827;
@@ -276,6 +276,11 @@
   button.primary{ background:var(--accent); }
   button.secondary{ background:#cbd5e1; }
   button.danger{ background:#fca5a5; }
+  button:disabled{
+    opacity:.5;
+    cursor:not-allowed;
+    filter:none;
+  }
 
   .log{
     height:220px;
@@ -310,7 +315,7 @@
   .overlay.active{ display:flex; }
 
   .question-card{
-    width:min(760px, 95%);
+    width:min(820px, 95%);
     background:#0f172a;
     border:1px solid #334155;
     border-radius:18px;
@@ -441,6 +446,7 @@
     border:1px solid #334155;
     border-radius:12px;
     padding:12px 14px;
+    gap:12px;
   }
 
   .level-row.locked{
@@ -452,6 +458,60 @@
     font-size:1rem;
   }
 
+  .upgrade-grid{
+    display:grid;
+    grid-template-columns:repeat(3, minmax(180px, 1fr));
+    gap:12px;
+    margin-top:14px;
+  }
+
+  .upgrade-card{
+    background:#111827;
+    border:1px solid #334155;
+    border-radius:14px;
+    padding:14px;
+  }
+
+  .upgrade-card h4{
+    margin:0 0 8px 0;
+    font-size:1rem;
+  }
+
+  .upgrade-card p{
+    margin:0 0 12px 0;
+    color:#cbd5e1;
+    font-size:.92rem;
+    line-height:1.4;
+  }
+
+  .active-upgrades{
+    margin-top:12px;
+    padding:12px;
+    background:#111827;
+    border:1px solid #334155;
+    border-radius:12px;
+  }
+
+  .active-upgrades strong{
+    display:block;
+    margin-bottom:8px;
+  }
+
+  .pill-list{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+
+  .pill{
+    background:#1e293b;
+    color:#e2e8f0;
+    border:1px solid #475569;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:.85rem;
+  }
+
   @media (max-width: 900px){
     .bottompanel{
       grid-template-columns:1fr;
@@ -459,6 +519,9 @@
     .tower.t1{ left:80px; }
     .tower.t2{ left:220px; }
     .tower.t3{ left:360px; }
+    .upgrade-grid{
+      grid-template-columns:1fr;
+    }
   }
 
   @media (max-width: 650px){
@@ -478,7 +541,7 @@
   <div class="topbar">
     <div class="titlebox">
       <h1 id="chapterHeading">Consumer Choice Defense</h1>
-      <p id="levelHeading">Defend the chapter. Beat levels. Earn stars.</p>
+      <p id="levelHeading">Defend the chapter. Beat levels. Earn stars. Choose upgrades.</p>
     </div>
 
     <div class="stats">
@@ -515,10 +578,10 @@
     </div>
 
     <div class="overlay active" id="questionOverlay">
-      <div class="question-card" id="overlayCard">
+      <div class="question-card">
         <h3 id="questionTitle">Consumer Choice Defense</h3>
         <div class="tag" id="questionTag">Prototype Campaign</div>
-        <div class="qtext" id="questionText">Press start and see whether this thing has any guts.</div>
+        <div class="qtext" id="questionText">Start the chapter and see if this thing can carry a progression loop.</div>
         <div class="answers" id="answersBox"></div>
         <div class="resultbox" id="resultBox"></div>
       </div>
@@ -533,8 +596,8 @@
 
     <div class="panel">
       <h2>What Changed</h2>
-      <p>This version breaks the prototype into actual levels. Beat one, get rated, unlock the next. That’s where progression starts feeling like a game instead of a sandbox punch-up.</p>
-      <p>Stars are based on survival, gate health, and accuracy. So students can pass a level, but dominating it still matters.</p>
+      <p>This build fixes the rushed feedback window, fixes the duplicate final button garbage, and adds simple between-level upgrades that carry through the chapter.</p>
+      <p>You beat a level, you pick one reward, and the next level reflects that choice. Nice and clean.</p>
       <div class="controls">
         <button class="primary" id="openMapBtn">Open Level Map</button>
         <button class="secondary" id="resetCampaignBtn">Reset Campaign</button>
@@ -553,9 +616,10 @@ const CHAPTER = {
   subtitle: "Hold the line across three prototype levels."
 };
 
+const FEEDBACK_DELAY_MS = 1800;
+
 /* =========================================================
    SAFE TO EDIT: LEVEL DEFINITIONS
-   Each level can have its own gate health, timings, and waves.
    ========================================================= */
 const LEVELS = [
   {
@@ -606,8 +670,37 @@ const LEVELS = [
 ];
 
 /* =========================================================
+   SAFE TO EDIT: BETWEEN-LEVEL UPGRADES
+   ========================================================= */
+const UPGRADE_OPTIONS = [
+  {
+    id: "gate",
+    name: "Reinforced Gate",
+    description: "+2 gate health on all future levels this run.",
+    apply() {
+      campaign.upgrades.gateBonus += 2;
+    }
+  },
+  {
+    id: "damage",
+    name: "Sharpened Towers",
+    description: "+1 tower damage on all future volleys this run.",
+    apply() {
+      campaign.upgrades.damageBonus += 1;
+    }
+  },
+  {
+    id: "slow",
+    name: "Frost Runes",
+    description: "Enemies move 10% slower on all future levels this run.",
+    apply() {
+      campaign.upgrades.slowFactor += 0.10;
+    }
+  }
+];
+
+/* =========================================================
    SAFE TO EDIT: QUESTION BANK
-   correct = index of correct answer in answers array
    ========================================================= */
 const QUESTIONS = [
   {
@@ -665,7 +758,13 @@ const QUESTIONS = [
    ========================================================= */
 const campaign = {
   unlockedLevel: 1,
-  bestStars: {}
+  bestStars: {},
+  upgrades: {
+    gateBonus: 0,
+    damageBonus: 0,
+    slowFactor: 0
+  },
+  chosenUpgrades: []
 };
 
 let state = {
@@ -686,7 +785,8 @@ let state = {
   enemiesSpawnedInWave: 0,
   questionOpen: false,
   currentLevelIndex: 0,
-  currentLevel: null
+  currentLevel: null,
+  awaitingUpgradeChoice: false
 };
 
 const lane = document.getElementById("lane");
@@ -722,6 +822,38 @@ function logMessage(text, cls = "") {
   logBox.prepend(div);
 }
 
+function getCurrentAccuracy() {
+  return state.totalAnswered ? Math.round((state.totalCorrect / state.totalAnswered) * 100) : 0;
+}
+
+function getActiveUpgradePills() {
+  const pills = [];
+  if (campaign.upgrades.gateBonus > 0) pills.push(`Gate +${campaign.upgrades.gateBonus}`);
+  if (campaign.upgrades.damageBonus > 0) pills.push(`Tower Damage +${campaign.upgrades.damageBonus}`);
+  if (campaign.upgrades.slowFactor > 0) pills.push(`Enemy Slow ${Math.round(campaign.upgrades.slowFactor * 100)}%`);
+  return pills;
+}
+
+function renderActiveUpgradesHTML() {
+  const pills = getActiveUpgradePills();
+  if (!pills.length) {
+    return `
+      <div class="active-upgrades">
+        <strong>Active Run Upgrades</strong>
+        <div style="color:#94a3b8;">None yet. Win a level and pick one.</div>
+      </div>
+    `;
+  }
+  return `
+    <div class="active-upgrades">
+      <strong>Active Run Upgrades</strong>
+      <div class="pill-list">
+        ${pills.map(p => `<span class="pill">${p}</span>`).join("")}
+      </div>
+    </div>
+  `;
+}
+
 function updateStats() {
   gateHealthStat.textContent = state.gateHealth;
   if (state.currentLevel) {
@@ -730,8 +862,7 @@ function updateStats() {
     waveStat.textContent = "0 / 0";
   }
   enemyCountStat.textContent = state.enemies.length;
-  const acc = state.totalAnswered ? Math.round((state.totalCorrect / state.totalAnswered) * 100) : 0;
-  accuracyStat.textContent = `${acc}%`;
+  accuracyStat.textContent = `${getCurrentAccuracy()}%`;
 }
 
 function showWaveBanner(text) {
@@ -760,14 +891,25 @@ function resetLevelState() {
   state.questionTimer = 0;
   state.enemiesSpawnedInWave = 0;
   state.questionOpen = false;
+  state.awaitingUpgradeChoice = false;
   questionOverlay.classList.remove("active");
   resultBox.className = "resultbox";
   resultBox.textContent = "";
   clearBattlefieldEntities();
 }
 
+function getLevelWithRunModifiers(level) {
+  const slowMultiplier = Math.max(0.4, 1 - campaign.upgrades.slowFactor);
+  return {
+    ...level,
+    gateHealth: level.gateHealth + campaign.upgrades.gateBonus,
+    enemySpeed: level.enemySpeed * slowMultiplier
+  };
+}
+
 function loadLevel(levelIndex) {
-  const level = LEVELS[levelIndex];
+  const baseLevel = LEVELS[levelIndex];
+  const level = getLevelWithRunModifiers(baseLevel);
   state.currentLevelIndex = levelIndex;
   state.currentLevel = level;
   state.gateHealth = level.gateHealth;
@@ -780,13 +922,16 @@ function loadLevel(levelIndex) {
 function startLevel(levelIndex) {
   loadLevel(levelIndex);
   resetLevelState();
-  state.currentLevel = LEVELS[levelIndex];
+  state.currentLevel = getLevelWithRunModifiers(LEVELS[levelIndex]);
   state.gateHealth = state.currentLevel.gateHealth;
   state.maxGateHealth = state.currentLevel.gateHealth;
   state.running = true;
   state.lastFrame = performance.now();
   levelHeading.textContent = state.currentLevel.name;
   logMessage(`Starting ${state.currentLevel.name}.`, "note");
+  if (getActiveUpgradePills().length) {
+    logMessage(`Run upgrades active: ${getActiveUpgradePills().join(", ")}.`, "note");
+  }
   showWaveBanner("Wave 1");
   updateStats();
   requestAnimationFrame(gameLoop);
@@ -805,11 +950,15 @@ function showLevelMap() {
   const rows = LEVELS.map((level, index) => {
     const unlocked = level.id <= campaign.unlockedLevel;
     const stars = campaign.bestStars[level.id] || 0;
+    const modifiedLevel = getLevelWithRunModifiers(level);
     return `
       <div class="level-row ${unlocked ? "" : "locked"}">
         <div>
           <div><strong>${level.name}</strong></div>
           <div style="color:#94a3b8; font-size:.9rem; margin-top:4px;">${level.description}</div>
+          <div style="color:#cbd5e1; font-size:.86rem; margin-top:6px;">
+            Gate ${modifiedLevel.gateHealth} | Enemy Speed ${modifiedLevel.enemySpeed.toFixed(2)} | Damage ${1 + campaign.upgrades.damageBonus}
+          </div>
         </div>
         <div style="display:flex; align-items:center; gap:12px;">
           <div class="mini-stars">${renderMiniStars(stars)}</div>
@@ -823,6 +972,7 @@ function showLevelMap() {
 
   answersBox.innerHTML = `
     <div class="level-list">${rows}</div>
+    ${renderActiveUpgradesHTML()}
   `;
   resultBox.className = "resultbox";
   resultBox.textContent = "";
@@ -865,6 +1015,8 @@ function handleAnswer(question, selectedIndex) {
   state.totalAnswered++;
   const correct = selectedIndex === question.correct;
 
+  Array.from(answersBox.querySelectorAll("button")).forEach(btn => btn.disabled = true);
+
   if (correct) {
     state.totalCorrect++;
     resultBox.className = "resultbox good";
@@ -879,7 +1031,7 @@ function handleAnswer(question, selectedIndex) {
     if (state.gateHealth <= 0) {
       state.gateHealth = 0;
       updateStats();
-      setTimeout(() => failLevel(), 700);
+      setTimeout(() => failLevel(), FEEDBACK_DELAY_MS);
     }
   }
 
@@ -891,7 +1043,7 @@ function handleAnswer(question, selectedIndex) {
       state.questionOpen = false;
       state.paused = false;
     }
-  }, 1000);
+  }, FEEDBACK_DELAY_MS);
 }
 
 function fireTowerVolley() {
@@ -903,7 +1055,7 @@ function fireTowerVolley() {
 
   chargeEls.forEach(el => {
     el.style.width = "100%";
-    setTimeout(() => el.style.width = "0%", 250);
+    setTimeout(() => el.style.width = "0%", 350);
   });
 
   towers.forEach(tower => {
@@ -921,7 +1073,7 @@ function fireTowerVolley() {
       y: tower.y,
       speed: state.currentLevel.projectileSpeed,
       targetId: target.id,
-      damage: 1,
+      damage: 1 + campaign.upgrades.damageBonus,
       element: proj
     });
   });
@@ -1084,7 +1236,7 @@ function handleQuestionTimer(delta) {
 }
 
 function calculateStars() {
-  const accuracy = state.totalAnswered ? Math.round((state.totalCorrect / state.totalAnswered) * 100) : 0;
+  const accuracy = getCurrentAccuracy();
   const gateRatio = state.maxGateHealth ? state.gateHealth / state.maxGateHealth : 0;
   let stars = 1;
 
@@ -1108,6 +1260,66 @@ function renderMiniStars(count) {
     html += i <= count ? "★" : "☆";
   }
   return html;
+}
+
+function showUpgradeChoice(nextLevelExists) {
+  state.awaitingUpgradeChoice = true;
+  questionTitle.textContent = "Choose Your Reward";
+  questionTag.textContent = "Between-Level Upgrade";
+  questionText.textContent = nextLevelExists
+    ? "You cleared the level. Pick one upgrade for the rest of this run before moving on."
+    : "You cleared the chapter. You can still inspect or replay, but there’s no next level to juice up.";
+
+  if (!nextLevelExists) {
+    answersBox.innerHTML = `
+      <div class="controls">
+        <button class="primary" onclick="showLevelMap()">Level Map</button>
+        <button class="secondary" onclick="replayCurrentLevel()">Replay Final Level</button>
+      </div>
+    `;
+    resultBox.className = "resultbox good";
+    resultBox.textContent = "Chapter cleared. No duplicate button clown show this time.";
+    return;
+  }
+
+  answersBox.innerHTML = `
+    <div class="upgrade-grid">
+      ${UPGRADE_OPTIONS.map(upgrade => `
+        <div class="upgrade-card">
+          <h4>${upgrade.name}</h4>
+          <p>${upgrade.description}</p>
+          <button class="primary" onclick="chooseUpgrade('${upgrade.id}')">Take Upgrade</button>
+        </div>
+      `).join("")}
+    </div>
+    ${renderActiveUpgradesHTML()}
+  `;
+  resultBox.className = "resultbox";
+  resultBox.textContent = "";
+}
+
+function chooseUpgrade(upgradeId) {
+  const upgrade = UPGRADE_OPTIONS.find(u => u.id === upgradeId);
+  if (!upgrade || !state.awaitingUpgradeChoice) return;
+
+  upgrade.apply();
+  campaign.chosenUpgrades.push(upgrade.name);
+  state.awaitingUpgradeChoice = false;
+  logMessage(`Upgrade chosen: ${upgrade.name}.`, "good");
+
+  questionTitle.textContent = "Upgrade Secured";
+  questionTag.textContent = "Run Power Increased";
+  questionText.textContent = `${upgrade.name} is now active for the rest of this run.`;
+
+  answersBox.innerHTML = `
+    <div class="controls">
+      <button class="primary" onclick="startNextLevel()">Next Level</button>
+      <button class="secondary" onclick="showLevelMap()">Level Map</button>
+    </div>
+    ${renderActiveUpgradesHTML()}
+  `;
+  resultBox.className = "resultbox good";
+  resultBox.textContent = "Good. Now take the stronger build into the next fight.";
 }
 
 function completeLevel() {
@@ -1152,9 +1364,10 @@ function completeLevel() {
       </div>
     </div>
     <div class="controls">
-      ${nextUnlocked ? `<button class="primary" onclick="startNextLevel()">Next Level</button>` : ""}
-      ${!finalLevel ? `<button class="secondary" onclick="replayCurrentLevel()">Replay Level</button>` : `<button class="primary" onclick="showLevelMap()">Level Map</button>`}
-      ${finalLevel ? `<button class="secondary" onclick="replayCurrentLevel()">Replay Final Level</button>` : ""}
+      <button class="primary" onclick="proceedAfterVictory(${nextUnlocked ? 1 : 0}, ${finalLevel ? 1 : 0})">
+        ${finalLevel ? "Finish Chapter" : "Continue"}
+      </button>
+      <button class="secondary" onclick="replayCurrentLevel()">Replay Level</button>
       <button class="secondary" onclick="showLevelMap()">Level Map</button>
     </div>
   `;
@@ -1170,6 +1383,30 @@ function completeLevel() {
   updateStats();
 }
 
+function proceedAfterVictory(nextUnlocked, finalLevel) {
+  if (finalLevel) {
+    showUpgradeChoice(false);
+    return;
+  }
+  if (nextUnlocked) {
+    showUpgradeChoice(true);
+    return;
+  }
+
+  questionTitle.textContent = "Locked by Progression";
+  questionTag.textContent = "No Next Level Yet";
+  questionText.textContent = "That level is done, but the next one is not available from this state. Head back to the map.";
+
+  answersBox.innerHTML = `
+    <div class="controls">
+      <button class="primary" onclick="showLevelMap()">Level Map</button>
+      <button class="secondary" onclick="replayCurrentLevel()">Replay Level</button>
+    </div>
+  `;
+  resultBox.className = "resultbox good";
+  resultBox.textContent = "Clean fallback. No weird dead ends.";
+}
+
 function failLevel() {
   if (state.gameOver) return;
   state.running = false;
@@ -1177,7 +1414,7 @@ function failLevel() {
   state.questionOpen = true;
   questionOverlay.classList.add("active");
 
-  const accuracy = state.totalAnswered ? Math.round((state.totalCorrect / state.totalAnswered) * 100) : 0;
+  const accuracy = getCurrentAccuracy();
 
   questionTitle.textContent = `${state.currentLevel.name} Failed`;
   questionTag.textContent = "Defeat";
@@ -1227,11 +1464,17 @@ function startNextLevel() {
 function resetCampaign() {
   campaign.unlockedLevel = 1;
   campaign.bestStars = {};
+  campaign.upgrades = {
+    gateBonus: 0,
+    damageBonus: 0,
+    slowFactor: 0
+  };
+  campaign.chosenUpgrades = [];
   logBox.innerHTML = "";
   resetLevelState();
   loadLevel(0);
   showLevelMap();
-  logMessage("Campaign reset. Back to level one. As it should be.", "note");
+  logMessage("Campaign reset. Upgrades wiped. Back to level one.", "note");
 }
 
 function gameLoop(timestamp) {
@@ -1252,12 +1495,14 @@ function gameLoop(timestamp) {
 }
 
 /* =========================================================
-   GLOBAL BUTTON HOOKS FOR INLINE HTML BUTTONS
+   GLOBAL BUTTON HOOKS
    ========================================================= */
 window.startFromMap = startFromMap;
 window.replayCurrentLevel = replayCurrentLevel;
 window.startNextLevel = startNextLevel;
 window.showLevelMap = showLevelMap;
+window.chooseUpgrade = chooseUpgrade;
+window.proceedAfterVictory = proceedAfterVictory;
 
 /* =========================================================
    INITIALIZE
