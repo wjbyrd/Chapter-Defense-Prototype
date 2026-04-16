@@ -699,6 +699,7 @@
       <p>Kill enemies, earn gold, strengthen towers between waves, and let upgraded defenses actually look stronger.</p>
       <div class="controls">
         <button class="primary" id="openMapBtn">Open Level Map</button>
+        <button class="secondary" id="openGuideBtn">Tower Guide</button>
         <button class="secondary" id="resetCampaignBtn">Reset Campaign</button>
       </div>
     </div>
@@ -919,7 +920,8 @@ let state = {
   tagHistory: [],
   askedQuestionIds: [],
   pendingQuestion: null,
-  awaitingWaveUpgradeChoice: false
+  awaitingWaveUpgradeChoice: false,
+  askedTagsThisLevel: {}
 };
 
 const lane = document.getElementById("lane");
@@ -953,6 +955,7 @@ const towerEls = {
 };
 
 document.getElementById("openMapBtn").addEventListener("click", showLevelMap);
+document.getElementById("openGuideBtn").addEventListener("click", showTowerGuide);
 document.getElementById("resetCampaignBtn").addEventListener("click", resetCampaign);
 
 function logMessage(text, cls = "") {
@@ -1105,6 +1108,7 @@ function resetLevelState() {
   state.tagHistory = [];
   state.askedQuestionIds = [];
   state.pendingQuestion = null;
+  state.askedTagsThisLevel = {};
   questionOverlay.classList.remove("active");
   resultBox.className = "resultbox";
   resultBox.textContent = "";
@@ -1152,9 +1156,9 @@ function startLevel(levelIndex) {
 }
 
 function getTagBreakdownHTML() {
-  const tags = Object.keys(state.conceptMemory);
+  const tags = Object.keys(state.conceptMemory).filter(tag => (state.conceptMemory[tag] || 0) > 0);
   if (!tags.length) {
-    return `<div style="color:#94a3b8;">No weak-tag pressure yet.</div>`;
+    return `<div style="color:#94a3b8;">No current weak-tag pressure. Chapter memory is stable right now.</div>`;
   }
   const sorted = [...tags].sort((a,b) => (state.conceptMemory[b] || 0) - (state.conceptMemory[a] || 0));
   return `
@@ -1162,6 +1166,91 @@ function getTagBreakdownHTML() {
       ${sorted.map(tag => `<span class="pill">${tag}: ${state.conceptMemory[tag]}</span>`).join("")}
     </div>
   `;
+}
+
+function getChapterPersistenceHTML() {
+  const trackedTags = Object.keys(state.conceptMemory).filter(tag => state.conceptMemory[tag] > 0).length;
+  return `
+    <div class="active-upgrades">
+      <strong>Chapter Memory Rules</strong>
+      <div style="color:#cbd5e1; line-height:1.5;">
+        Weak-tag pressure persists across levels in the same run so the chapter measures cumulative knowledge, not isolated room clears.
+        Replay a level during the run and the chapter still remembers where the student struggled.
+        Reset Campaign wipes the chapter memory and starts fresh.
+      </div>
+      <div class="pill-list" style="margin-top:10px;">
+        <span class="pill">Tracked weak tags: ${trackedTags}</span>
+        <span class="pill">Distinct tags seen this level: ${Object.keys(state.askedTagsThisLevel || {}).length}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderTowerGuideHTML() {
+  const towers = getTowerDefinitions();
+  return `
+    <div class="upgrade-grid">
+      ${towers.map(tower => {
+        const detail = tower.role === "single"
+          ? `Single-target finisher. Damage ${tower.damage}. Bonus vs boss ${tower.bonusVsBoss}. Best for deleting priority threats.`
+          : tower.role === "aoe"
+            ? `Wave clearer. Damage ${tower.damage}. Splash radius ${tower.splashRadius}. Best when the lane gets crowded.`
+            : `Support tower. Damage ${tower.damage}. Slow ${Math.round(tower.slowAmount * 100)}% for ${Math.round(tower.slowDuration / 1000)}s. Best for control.`;
+        const nextCost = getTowerUpgradeCost(tower.role);
+        return `
+          <div class="upgrade-card">
+            <h4>${tower.name} (L${tower.level})</h4>
+            <p>${detail}</p>
+            <div class="shop-meta">Next between-wave upgrade: ${nextCost} gold</div>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function showTowerGuide() {
+  state.running = false;
+  state.paused = true;
+  state.questionOpen = true;
+  questionOverlay.classList.add("active");
+
+  questionTitle.textContent = "Defense Field Manual";
+  questionTag.textContent = "Tower Guide";
+  questionText.textContent = "Here is what each tower does, how tower gold upgrades work, and how chapter memory tracks cumulative knowledge.";
+
+  answersBox.innerHTML = `
+    ${renderTowerGuideHTML()}
+    <div class="active-upgrades">
+      <strong>Economy and Upgrades</strong>
+      <div style="color:#cbd5e1; line-height:1.5;">
+        Enemies drop gold when defeated. Between waves, that gold can be spent to improve a specific tower.
+        Tower upgrades are separate from between-level run upgrades, so players are managing both tactical tower growth and broader run bonuses.
+      </div>
+      <div class="pill-list" style="margin-top:10px;">
+        <span class="pill">Current Gold: ${campaign.gold}</span>
+        <span class="pill">Preference L${campaign.towerLevels.single}</span>
+        <span class="pill">Budget L${campaign.towerLevels.aoe}</span>
+        <span class="pill">Utility L${campaign.towerLevels.slow}</span>
+      </div>
+    </div>
+    ${renderActiveUpgradesHTML()}
+    ${getChapterPersistenceHTML()}
+    <div class="controls">
+      <button class="primary" onclick="showLevelMap()">Level Map</button>
+      <button class="secondary" onclick="closeOverlayResume()">Return</button>
+    </div>
+  `;
+  resultBox.className = "resultbox good";
+  resultBox.textContent = "Player-facing clarity matters. If the system is smart but invisible, the design loses half its punch.";
+}
+
+function closeOverlayResume() {
+  questionOverlay.classList.remove("active");
+  state.questionOpen = false;
+  if (!state.gameOver && !state.awaitingWaveUpgradeChoice && !state.awaitingUpgradeChoice) {
+    state.paused = false;
+  }
 }
 
 function showLevelMap() {
@@ -1204,6 +1293,7 @@ function showLevelMap() {
   answersBox.innerHTML = `
     <div class="level-list">${rows}</div>
     ${renderActiveUpgradesHTML()}
+    <div class="controls"><button class="secondary" onclick="showTowerGuide()">Tower Guide</button></div>
     <div class="active-upgrades">
       <strong>Run Economy</strong>
       <div class="pill-list">
@@ -1217,6 +1307,7 @@ function showLevelMap() {
       <strong>Weak-Tag Pressure</strong>
       ${getTagBreakdownHTML()}
     </div>
+    ${getChapterPersistenceHTML()}
   `;
   resultBox.className = "resultbox";
   resultBox.textContent = "";
@@ -1232,6 +1323,18 @@ function startFromMap(levelIndex) {
 function recordTagHistory(tag) {
   state.tagHistory.push(tag);
   if (state.tagHistory.length > RECENT_TAG_WINDOW) state.tagHistory.shift();
+  state.askedTagsThisLevel[tag] = (state.askedTagsThisLevel[tag] || 0) + 1;
+}
+
+function getCurrentTagStreak() {
+  if (!state.tagHistory.length) return { tag: null, count: 0 };
+  const lastTag = state.tagHistory[state.tagHistory.length - 1];
+  let count = 0;
+  for (let i = state.tagHistory.length - 1; i >= 0; i--) {
+    if (state.tagHistory[i] !== lastTag) break;
+    count++;
+  }
+  return { tag: lastTag, count };
 }
 
 function getWeakestTag() {
@@ -1244,6 +1347,8 @@ function getWeakestTag() {
 function weightedPick(pool) {
   if (!pool.length) return null;
   const weighted = [];
+  const streak = getCurrentTagStreak();
+  const distinctTagsSeen = Object.keys(state.askedTagsThisLevel || {}).length;
 
   pool.forEach(q => {
     let weight = 1;
@@ -1254,8 +1359,16 @@ function weightedPick(pool) {
       weight += 1;
     }
 
+    if ((state.askedTagsThisLevel[q.tag] || 0) === 0 && distinctTagsSeen < MIN_DISTINCT_TAGS_PER_LEVEL) {
+      weight += COVERAGE_BOOST;
+    }
+
     if (state.askedQuestionIds.slice(-4).includes(q.id)) {
       weight = Math.max(1, weight - 2);
+    }
+
+    if (streak.count >= MAX_REPEAT_TAG_STREAK && q.tag === streak.tag) {
+      weight = Math.max(1, weight - 3);
     }
 
     for (let i = 0; i < weight; i++) weighted.push(q);
@@ -1268,9 +1381,26 @@ function pickAdaptiveQuestion() {
   const wave = state.currentLevel.waves[state.waveIndex];
   const isBossWave = !!wave.boss;
   const weakestTag = getWeakestTag();
+  const streak = getCurrentTagStreak();
 
   let pool = QUESTIONS.filter(q => !state.askedQuestionIds.slice(-5).includes(q.id));
   if (!pool.length) pool = [...QUESTIONS];
+
+  if (!isBossWave && streak.count >= MAX_REPEAT_TAG_STREAK) {
+    const mixedPool = pool.filter(q => q.tag !== streak.tag);
+    if (mixedPool.length) {
+      pool = mixedPool;
+      logMessage(`Guardrail triggered: forcing a mixed tag after repeated ${streak.tag}.`, "note");
+    }
+  }
+
+  if (!isBossWave && Object.keys(state.askedTagsThisLevel || {}).length < MIN_DISTINCT_TAGS_PER_LEVEL) {
+    const unseenPool = pool.filter(q => !state.askedTagsThisLevel[q.tag]);
+    if (unseenPool.length) {
+      pool = unseenPool;
+      logMessage("Coverage guardrail triggered: pulling an unseen tag for this level.", "note");
+    }
+  }
 
   if (isBossWave && weakestTag) {
     const targeted = pool.filter(q => q.tag === weakestTag);
@@ -1711,6 +1841,7 @@ function showWaveUpgradeChoice() {
     ${renderWaveShopHTML()}
     <div class="controls">
       <button class="primary" onclick="startNextWave()">Start Next Wave</button>
+      <button class="secondary" onclick="showTowerGuide()">Tower Guide</button>
     </div>
   `;
   resultBox.className = "resultbox good";
