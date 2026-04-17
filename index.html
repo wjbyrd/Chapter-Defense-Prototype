@@ -1221,10 +1221,10 @@ function placeTowerInSelectedSlot(type) {
 
   showTowerSetupOverlay();
 }
-
+  
 function closeSlotBuildMenu() {
   state.selectedSlotId = null;
-  state.questionOpen = false;
+  showTowerSetupOverlay();
 }
   
 function recordTagHistory(tag) {
@@ -2090,32 +2090,17 @@ function startFromMap(levelIndex) {
 
 function showTowerSetupOverlay() {
   state.paused = true;
-  state.questionOpen = true;
-  questionOverlay.classList.add("active");
-  questionOverlay.classList.add("setup-passive");
+  state.questionOpen = false;
+  questionOverlay.classList.remove("active");
+  questionOverlay.classList.remove("setup-passive");
 
   questionTitle.textContent = state.currentLevel.name;
   questionTag.textContent = "Tower Setup";
   questionText.textContent = `Click an open slot on the battlefield to place ${state.starterBuildsRemaining} starting tower${state.starterBuildsRemaining === 1 ? "" : "s"}.`;
 
-  answersBox.innerHTML = `
-    <div class="active-upgrades">
-      <strong>Starting Gold</strong>
-      <div class="pill-list">
-        <span class="pill">Gold: ${campaign.gold}</span>
-        <span class="pill">Towers left to place: ${state.starterBuildsRemaining}</span>
-        <span class="pill">Placed Towers: ${campaign.towers.length}</span>
-      </div>
-    </div>
-
-    <div class="controls">
-      <button class="primary" ${state.starterBuildsRemaining === 0 ? "" : "disabled"} onclick="beginBattleAfterSetup()">Start Battle</button>
-      <button class="secondary" onclick="showLevelMap()">Back to Map</button>
-    </div>
-  `;
-
+  answersBox.innerHTML = "";
   resultBox.className = "resultbox good";
-  resultBox.textContent = "Click a slot on the map, then choose a tower.";
+  resultBox.textContent = "";
 }
 
 function selectBuildType(type) {
