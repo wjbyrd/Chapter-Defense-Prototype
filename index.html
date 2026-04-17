@@ -1156,15 +1156,14 @@ function renderSlotMarkers() {
 
   getCurrentWorldLayout().slots.forEach(slot => {
     const placed = getPlacedTowerInSlot(slot.id);
+    if (placed) return;
+
     const marker = document.createElement("button");
     marker.className = "slot-marker";
     marker.style.left = `${slot.x - 32}px`;
-    marker.textContent = placed ? "" : `Slot ${slot.id + 1}`;
+    marker.textContent = `Slot ${slot.id + 1}`;
 
-    if (placed) {
-      marker.disabled = true;
-      marker.classList.add("filled");
-    } else if (state.setupMode) {
+    if (state.setupMode) {
       marker.addEventListener("click", () => openSlotBuildMenu(slot.id));
     } else if (state.shopUnlocked) {
       marker.addEventListener("click", () => openUpgradeBuildMenu(slot.id));
