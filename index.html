@@ -977,7 +977,7 @@ let state = {
   pendingBuildType: null,
   shopUnlocked: false,
   upgradeMode: false,
-  upgradeAction: null
+  upgradeAction: null,
   starterBuildsRemaining: 3
 };
 
@@ -1483,66 +1483,6 @@ function renderCommandPanel() {
       <button class="secondary" onclick="setUpgradeAction('build-aoe')">Build Budget</button>
       <button class="secondary" onclick="setUpgradeAction('build-slow')">Build Utility</button>
     </div>
-    <div class="controls">
-      <button class="primary" onclick="startNextWave()">Start Next Wave</button>
-      <button class="secondary" onclick="showTowerGuide()">Tower Guide</button>
-      <button class="secondary" onclick="showLevelMap()">Open Level Map</button>
-    </div>
-  `;
-}
-
-  const upgradeCards = campaign.towers.map(tower => {
-    const cost = getTowerUpgradeCost(tower);
-    return `
-      <div class="shop-card">
-        <h5>${TOWER_TYPES[tower.type].name}</h5>
-        <p>Slot ${tower.slotId + 1} • Level ${tower.level}</p>
-        <div class="shop-meta">Upgrade Cost: ${cost} gold</div>
-        <button
-          class="${campaign.gold >= cost ? "primary" : "secondary"}"
-          ${campaign.gold >= cost ? "" : "disabled"}
-          onclick="upgradeTower(${tower.id})"
-        >
-          Upgrade
-        </button>
-      </div>
-    `;
-  }).join("");
-
-  const buildCards = getOpenSlots().length ? Object.values(TOWER_TYPES).map(tower => `
-    <div class="shop-card">
-      <h5>${tower.name}</h5>
-      <p>Build in any open slot.</p>
-      <div class="shop-meta">Build Cost: ${tower.buildCost} gold</div>
-      <button
-        class="${campaign.gold >= tower.buildCost ? "primary" : "secondary"}"
-        ${campaign.gold >= tower.buildCost ? "" : "disabled"}
-        onclick="beginTowerPlacement('${tower.key}')"
-      >
-        Place Tower
-      </button>
-    </div>
-  `).join("") : `<p style="color:#94a3b8;">All slots filled.</p>`;
-
-  panel.innerHTML = `
-    <h2>Upgrade Access Unlocked</h2>
-    <p>Spend as much gold as you want before starting the next wave.</p>
-    <div class="pill-list" style="margin-bottom:12px;">
-      <span class="pill">Gold: ${campaign.gold}</span>
-      <span class="pill">Placed Towers: ${campaign.towers.length}</span>
-      <span class="pill">Open Slots: ${getOpenSlots().length}</span>
-    </div>
-
-    <div class="active-upgrades">
-      <strong>Upgrade Towers</strong>
-      <div class="shop-grid">${upgradeCards || `<p style="color:#94a3b8;">No towers placed.</p>`}</div>
-    </div>
-
-    <div class="active-upgrades">
-      <strong>Build New Tower</strong>
-      <div class="shop-grid">${buildCards}</div>
-    </div>
-
     <div class="controls">
       <button class="primary" onclick="startNextWave()">Start Next Wave</button>
       <button class="secondary" onclick="showTowerGuide()">Tower Guide</button>
@@ -2443,8 +2383,6 @@ window.showLevelMap = showLevelMap;
 window.startNextWave = startNextWave;
 window.showTowerGuide = showTowerGuide;
 window.closeOverlayResume = closeOverlayResume;
-window.selectBuildType = selectBuildType;
-window.placeStarterTower = placeStarterTower;
 window.beginBattleAfterSetup = beginBattleAfterSetup;
 window.buyMetaUpgrade = buyMetaUpgrade;
 window.upgradeTower = upgradeTower;
@@ -2452,7 +2390,7 @@ window.openSlotBuildMenu = openSlotBuildMenu;
 window.placeTowerInSelectedSlot = placeTowerInSelectedSlot;
 window.closeSlotBuildMenu = closeSlotBuildMenu;  
 window.beginTowerPlacement = beginTowerPlacement;
-  window.setUpgradeAction = setUpgradeAction;
+window.setUpgradeAction = setUpgradeAction;
 
 loadLevel(0);
 showLevelMap();
