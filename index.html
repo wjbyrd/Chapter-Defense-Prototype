@@ -434,6 +434,14 @@
     margin-top:10px;
   }
 
+  .overlay.setup-passive{
+  pointer-events:none;
+  }
+
+ .overlay.setup-passive .question-card{
+  pointer-events:auto;
+  }
+
   .question-card h3{
     margin:0 0 10px 0;
     font-size:1.2rem;
@@ -1063,6 +1071,7 @@ function resetLevelState() {
   state.selectedBuildType = null;
   state.starterBuildsRemaining = 3;
   questionOverlay.classList.remove("active");
+  questionOverlay.classList.remove("setup-passive");
   resultBox.className = "resultbox";
   resultBox.textContent = "";
   state.selectedSlotId = null;
@@ -1219,6 +1228,7 @@ function placeTowerInSelectedSlot(type) {
 function closeSlotBuildMenu() {
   state.selectedSlotId = null;
   questionOverlay.classList.remove("active");
+  questionOverlay.classList.remove("setup-passive");
   state.questionOpen = false;
 }
   
@@ -2087,6 +2097,7 @@ function showTowerSetupOverlay() {
   state.paused = true;
   state.questionOpen = true;
   questionOverlay.classList.add("active");
+  questionOverlay.classList.add("setup-passive");
 
   questionTitle.textContent = state.currentLevel.name;
   questionTag.textContent = "Tower Setup";
@@ -2132,12 +2143,12 @@ function placeStarterTower(slotId) {
 
 function beginBattleAfterSetup() {
   if (state.starterBuildsRemaining > 0) return;
-
+  questionOverlay.classList.add("active");
+  questionOverlay.classList.remove("setup-passive");
   state.setupMode = false;
   state.questionOpen = false;
   state.selectedSlotId = null;
   state.paused = false;
-  questionOverlay.classList.remove("active");
 
   state.running = true;
   state.lastFrame = performance.now();
@@ -2394,6 +2405,9 @@ window.beginBattleAfterSetup = beginBattleAfterSetup;
 window.buyMetaUpgrade = buyMetaUpgrade;
 window.upgradeTower = upgradeTower;
 window.buildTowerInFirstOpenSlot = buildTowerInFirstOpenSlot;
+window.openSlotBuildMenu = openSlotBuildMenu;
+window.placeTowerInSelectedSlot = placeTowerInSelectedSlot;
+window.closeSlotBuildMenu = closeSlotBuildMenu;  
 
 loadLevel(0);
 showLevelMap();
