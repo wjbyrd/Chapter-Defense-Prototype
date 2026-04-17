@@ -983,6 +983,7 @@ let state = {
   setupMode: false,
   selectedBuildType: null,
   selectedSlotId: null,
+  pendingBuildType: null,
   starterBuildsRemaining: 3
 };
 
@@ -1152,7 +1153,7 @@ function startLevel(levelIndex) {
   logMessage(`Starting ${state.currentLevel.name}. Towers now auto-fire. Questions gate upgrades.`, "note");
   requestAnimationFrame(gameLoop);
 }
-
+  
 function renderSlotMarkers() {
   document.querySelectorAll(".slot-marker").forEach(el => el.remove());
 
@@ -1169,6 +1170,8 @@ function renderSlotMarkers() {
       marker.classList.add("filled");
     } else if (state.setupMode) {
       marker.addEventListener("click", () => openSlotBuildMenu(slot.id));
+    } else if (state.pendingBuildType) {
+      marker.addEventListener("click", () => placePendingTower(slot.id));
     } else {
       marker.disabled = true;
     }
@@ -1177,6 +1180,20 @@ function renderSlotMarkers() {
   });
 }
 
+function placePendingTower(slotId) {
+  if (!state.pendingBuildType) return;
+
+  const built = buildTower(state.pendingBuildType, slotId);
+  if (!built) return;
+
+  logMessage(`${TOWER_TYPES[state.pendingBuildType].name} built in Slot ${slotId + 1}.`, "good");
+  state.pendingBuildType = null;
+
+  if (state.awaitingWaveUpgradeChoice) {
+    showWaveUpgradeChoice();
+  }
+}
+  
 function openSlotBuildMenu(slotId) {
   if (!state.setupMode) return;
   if (state.starterBuildsRemaining <= 0) return;
@@ -1413,7 +1430,7 @@ function renderWaveShopHTML() {
       <button
         class="${campaign.gold >= tower.buildCost ? "primary" : "secondary"}"
         ${campaign.gold >= tower.buildCost ? "" : "disabled"}
-        onclick="buildTowerInFirstOpenSlot('${tower.key}')"
+        onclick="beginTowerPlacement('${tower.key}')"
       >
         Build
       </button>
@@ -2004,12 +2021,17 @@ function upgradeTower(towerId) {
   showWaveUpgradeChoice();
 }
 
-function buildTowerInFirstOpenSlot(type) {
-  const openSlots = getOpenSlots();
-  if (!openSlots.length) return;
-  const built = buildTower(type, openSlots[0].id);
-  if (!built) return;
-  showWaveUpgradeChoice();
+function beginTowerPlacement(type) {
+  if (!getOpenSlots().length) return;
+  if (campaign.gold < TOWER_TYPES[type].buildCost) return;
+
+  state.pendingBuildType = type;
+  questionOverlay.classList.remove("active");
+  state.questionOpen = false;
+  state.paused = false;
+
+  logMessage(`Placement mode: click an open slot to build ${TOWER_TYPES[type].name}.`, "note");
+  showWaveBanner(`Place ${TOWER_TYPES[type].name}`);
 }
   
 function showLevelMap() {
@@ -2389,6 +2411,7 @@ window.buildTowerInFirstOpenSlot = buildTowerInFirstOpenSlot;
 window.openSlotBuildMenu = openSlotBuildMenu;
 window.placeTowerInSelectedSlot = placeTowerInSelectedSlot;
 window.closeSlotBuildMenu = closeSlotBuildMenu;  
+window.beginTowerPlacement = beginTowerPlacement;
 
 loadLevel(0);
 showLevelMap();
