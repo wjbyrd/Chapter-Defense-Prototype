@@ -100,7 +100,8 @@
   justify-content:center;
   color:#cbd5e1;
   font-weight:bold;
-  pointer-events:none;
+  pointer-events:auto;
+  z-index:5;
 }
 
 .slot-marker.filled{
@@ -1064,27 +1065,11 @@ function resetLevelState() {
   questionOverlay.classList.remove("active");
   resultBox.className = "resultbox";
   resultBox.textContent = "";
+  state.selectedSlotId = null;
   clearBattlefieldEntities();
   renderPlacedTowers();
 }
-
-function renderSlotMarkers() {
-  document.querySelectorAll(".slot-marker").forEach(el => el.remove());
-
-  getCurrentWorldLayout().slots.forEach(slot => {
-    const marker = document.createElement("div");
-    marker.className = "slot-marker";
-    marker.style.left = `${slot.x - 32}px`;
-    marker.textContent = `${slot.id + 1}`;
-
-    if (getPlacedTowerInSlot(slot.id)) {
-      marker.classList.add("filled");
-    }
-
-    lane.appendChild(marker);
-  });
-}
-  
+ 
 function renderPlacedTowers() {
   document.querySelectorAll(".placed-tower").forEach(el => el.remove());
 
@@ -2105,34 +2090,7 @@ function showTowerSetupOverlay() {
 
   questionTitle.textContent = state.currentLevel.name;
   questionTag.textContent = "Tower Setup";
-  questionText.textContent = `Choose and place ${state.starterBuildsRemaining} starting tower${state.starterBuildsRemaining === 1 ? "" : "s"}.`;
-
-  const towerButtons = Object.values(TOWER_TYPES).map(tower => {
-    const selected = state.selectedBuildType === tower.key;
-    const disabled = campaign.gold < tower.buildCost || state.starterBuildsRemaining <= 0;
-    return `
-      <button
-        class="${selected ? "primary" : "secondary"}"
-        ${disabled ? "disabled" : ""}
-        onclick="selectBuildType('${tower.key}')"
-      >
-        ${tower.name} (${tower.buildCost}g)
-      </button>
-    `;
-  }).join("");
-
-  const slotButtons = getCurrentWorldLayout().slots.map(slot => {
-    const placed = getPlacedTowerInSlot(slot.id);
-    return `
-      <button
-        class="${placed ? "secondary" : "primary"}"
-        ${placed || !state.selectedBuildType || state.starterBuildsRemaining <= 0 ? "disabled" : ""}
-        onclick="placeStarterTower(${slot.id})"
-      >
-        ${placed ? `${TOWER_TYPES[placed.type].name}` : `Slot ${slot.id + 1}`}
-      </button>
-    `;
-  }).join("");
+  questionText.textContent = `Click an open slot on the battlefield to place ${state.starterBuildsRemaining} starting tower${state.starterBuildsRemaining === 1 ? "" : "s"}.`;
 
   answersBox.innerHTML = `
     <div class="active-upgrades">
@@ -2144,16 +2102,6 @@ function showTowerSetupOverlay() {
       </div>
     </div>
 
-    <div class="active-upgrades">
-      <strong>Choose Tower Type</strong>
-      <div class="controls">${towerButtons}</div>
-    </div>
-
-    <div class="active-upgrades">
-      <strong>Choose Slot</strong>
-      <div class="controls">${slotButtons}</div>
-    </div>
-
     <div class="controls">
       <button class="primary" ${state.starterBuildsRemaining === 0 ? "" : "disabled"} onclick="beginBattleAfterSetup()">Start Battle</button>
       <button class="secondary" onclick="showLevelMap()">Back to Map</button>
@@ -2161,7 +2109,7 @@ function showTowerSetupOverlay() {
   `;
 
   resultBox.className = "resultbox good";
-  resultBox.textContent = "Build your opening defense before the first wave begins.";
+  resultBox.textContent = "Click a slot on the map, then choose a tower.";
 }
 
 function selectBuildType(type) {
@@ -2187,6 +2135,7 @@ function beginBattleAfterSetup() {
 
   state.setupMode = false;
   state.questionOpen = false;
+  state.selectedSlotId = null;
   state.paused = false;
   questionOverlay.classList.remove("active");
 
