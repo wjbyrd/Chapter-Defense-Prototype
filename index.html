@@ -702,15 +702,7 @@
       <div class="log" id="logBox"></div>
     </div>
 
-    <div class="panel">
-      <h2>What Changed</h2>
-      <p>This build now adds in-run gold, between-wave tower upgrades, visual tower growth, and the adaptive tag system already in place.</p>
-      <p>Kill enemies, earn gold, strengthen towers between waves, and let upgraded defenses actually look stronger.</p>
-      <div class="controls">
-        <button class="primary" id="openMapBtn">Open Level Map</button>
-        <button class="secondary" id="openGuideBtn">Tower Guide</button>
-        <button class="secondary" id="resetCampaignBtn">Reset Campaign</button>
-      </div>
+    <div class="panel" id="commandPanel"></div>
     </div>
   </div>
 
@@ -984,6 +976,7 @@ let state = {
   selectedBuildType: null,
   selectedSlotId: null,
   pendingBuildType: null,
+  shopUnlocked: false,
   starterBuildsRemaining: 3
 };
 
@@ -1191,10 +1184,7 @@ function placePendingTower(slotId) {
   state.pendingBuildType = null;
 
   renderSlotMarkers();
-
-  if (state.awaitingWaveUpgradeChoice) {
-    startNextWave();
-  }
+  renderCommandPanel();
 }
   
 function openSlotBuildMenu(slotId) {
@@ -1394,7 +1384,7 @@ function showWaveQuestionGate() {
   askUpgradeQuestion(
     () => {
       state.awaitingWaveQuestion = false;
-      showWaveUpgradeChoice();
+      unlockWaveShop();
     },
     () => {
       state.awaitingWaveQuestion = false;
@@ -1404,6 +1394,7 @@ function showWaveQuestionGate() {
     title
   );
 }
+  
 
 function renderWaveShopHTML() {
   const upgradeCards = campaign.towers.map(tower => {
@@ -1458,30 +1449,21 @@ function renderWaveShopHTML() {
   `;
 }
 
-function showWaveUpgradeChoice() {
+function unlockWaveShop() {
   state.awaitingWaveUpgradeChoice = true;
+  state.shopUnlocked = true;
   state.paused = true;
-  state.questionOpen = true;
-  questionOverlay.classList.add("active");
-  questionTitle.textContent = `Wave ${state.waveIndex + 1} Cleared`;
-  questionTag.textContent = "Between-Wave Shop";
-  questionText.textContent = "The lane is clear. Spend gold to improve towers before the next wave.";
-  answersBox.innerHTML = `
-    ${renderWaveShopHTML()}
-    <div class="controls">
-      <button class="primary" onclick="startNextWave()">Start Next Wave</button>
-      <button class="secondary" onclick="showTowerGuide()">Tower Guide</button>
-    </div>
-  `;
-  resultBox.className = "resultbox good";
-  resultBox.textContent = "Questions now gate the shop. Towers auto-fire either way.";
+  state.questionOpen = false;
+  questionOverlay.classList.remove("active");
+
+  logMessage("Upgrade access unlocked. Spend gold or start the next wave.", "good");
+  showWaveBanner("Upgrade Access Unlocked");
+  renderCommandPanel();
 }
 
 function startNextWave() {
-  if (!state.awaitingWaveUpgradeChoice && state.waveIndex < state.currentLevel.waves.length - 1 && state.enemies.length === 0 && state.enemiesSpawnedInWave >= getCurrentWave().entries.length) {
-    // fallback path
-  }
   state.awaitingWaveUpgradeChoice = false;
+  state.shopUnlocked = false;
   state.questionOpen = false;
   state.paused = false;
   questionOverlay.classList.remove("active");
@@ -1495,7 +1477,87 @@ function startNextWave() {
       logMessage(`Wave ${state.waveIndex + 1} begins.`, "note");
     }
   }
+
+  renderCommandPanel();
   updateStats();
+}
+
+function renderCommandPanel() {
+  const panel = document.getElementById("commandPanel");
+  if (!panel) return;
+
+  if (!state.shopUnlocked) {
+    panel.innerHTML = `
+      <h2>Command Panel</h2>
+      <p>Answer questions correctly to unlock upgrades between waves.</p>
+      <p>Gold lets you upgrade towers or place new ones in open slots.</p>
+      <div class="controls">
+        <button class="primary" onclick="showLevelMap()">Open Level Map</button>
+        <button class="secondary" onclick="showTowerGuide()">Tower Guide</button>
+        <button class="secondary" onclick="resetCampaign()">Reset Campaign</button>
+      </div>
+    `;
+    return;
+  }
+
+  const upgradeCards = campaign.towers.map(tower => {
+    const cost = getTowerUpgradeCost(tower);
+    return `
+      <div class="shop-card">
+        <h5>${TOWER_TYPES[tower.type].name}</h5>
+        <p>Slot ${tower.slotId + 1} • Level ${tower.level}</p>
+        <div class="shop-meta">Upgrade Cost: ${cost} gold</div>
+        <button
+          class="${campaign.gold >= cost ? "primary" : "secondary"}"
+          ${campaign.gold >= cost ? "" : "disabled"}
+          onclick="upgradeTower(${tower.id})"
+        >
+          Upgrade
+        </button>
+      </div>
+    `;
+  }).join("");
+
+  const buildCards = getOpenSlots().length ? Object.values(TOWER_TYPES).map(tower => `
+    <div class="shop-card">
+      <h5>${tower.name}</h5>
+      <p>Build in any open slot.</p>
+      <div class="shop-meta">Build Cost: ${tower.buildCost} gold</div>
+      <button
+        class="${campaign.gold >= tower.buildCost ? "primary" : "secondary"}"
+        ${campaign.gold >= tower.buildCost ? "" : "disabled"}
+        onclick="beginTowerPlacement('${tower.key}')"
+      >
+        Place Tower
+      </button>
+    </div>
+  `).join("") : `<p style="color:#94a3b8;">All slots filled.</p>`;
+
+  panel.innerHTML = `
+    <h2>Upgrade Access Unlocked</h2>
+    <p>Spend as much gold as you want before starting the next wave.</p>
+    <div class="pill-list" style="margin-bottom:12px;">
+      <span class="pill">Gold: ${campaign.gold}</span>
+      <span class="pill">Placed Towers: ${campaign.towers.length}</span>
+      <span class="pill">Open Slots: ${getOpenSlots().length}</span>
+    </div>
+
+    <div class="active-upgrades">
+      <strong>Upgrade Towers</strong>
+      <div class="shop-grid">${upgradeCards || `<p style="color:#94a3b8;">No towers placed.</p>`}</div>
+    </div>
+
+    <div class="active-upgrades">
+      <strong>Build New Tower</strong>
+      <div class="shop-grid">${buildCards}</div>
+    </div>
+
+    <div class="controls">
+      <button class="primary" onclick="startNextWave()">Start Next Wave</button>
+      <button class="secondary" onclick="showTowerGuide()">Tower Guide</button>
+      <button class="secondary" onclick="showLevelMap()">Open Level Map</button>
+    </div>
+  `;
 }
 
 function getCurrentWave() {
@@ -2010,18 +2072,20 @@ function getTowerUpgradeCost(tower) {
   const base = TOWER_TYPES[tower.type].upgradeCostBase;
   return base + ((tower.level - 1) * 4);
 }
-
+  
 function upgradeTower(towerId) {
   const tower = campaign.towers.find(t => t.id === towerId);
   if (!tower) return;
+
   const cost = getTowerUpgradeCost(tower);
   if (campaign.gold < cost) return;
 
   campaign.gold -= cost;
   tower.level += 1;
+
   updateStats();
   renderPlacedTowers();
-  showWaveUpgradeChoice();
+  renderCommandPanel();
 }
 
 function beginTowerPlacement(type) {
