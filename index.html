@@ -998,10 +998,6 @@ const enemyCountStat = document.getElementById("enemyCountStat");
 const accuracyStat = document.getElementById("accuracyStat");
 const goldStat = document.getElementById("goldStat");
 
-document.getElementById("openMapBtn").addEventListener("click", showLevelMap);
-document.getElementById("openGuideBtn").addEventListener("click", showTowerGuide);
-document.getElementById("resetCampaignBtn").addEventListener("click", resetCampaign);
-
 function logMessage(text, cls = "") {
   const div = document.createElement("div");
   div.className = `log-entry ${cls}`;
@@ -2043,8 +2039,8 @@ function showTowerGuide() {
   <div class="controls">
     <button class="primary" onclick="showLevelMap()">Level Map</button>
     ${
-      state.awaitingWaveUpgradeChoice
-        ? `<button class="secondary" onclick="showWaveUpgradeChoice()">Return to Shop</button>`
+    state.awaitingWaveUpgradeChoice
+        ? `<button class="secondary" onclick="closeOverlayResume()">Return</button>`
         : `<button class="secondary" onclick="closeOverlayResume()">Return</button>`
       }
   </div>
@@ -2358,6 +2354,7 @@ function resetCampaign() {
   loadLevel(0);
   renderPlacedTowers();
   showLevelMap();
+  renderCommandPanel();
   logMessage("Campaign reset. Gold wiped. Towers cleared. Chapter memory wiped.", "note");
 }
 
