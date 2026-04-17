@@ -1214,21 +1214,16 @@ function placeTowerInSelectedSlot(type) {
   state.starterBuildsRemaining--;
   state.selectedSlotId = null;
 
-  questionOverlay.classList.remove("active");
-  state.questionOpen = false;
-
-  renderPlacedTowers();
-
   if (state.starterBuildsRemaining === 0) {
-    resultBox.className = "resultbox good";
-    resultBox.textContent = "";
+    showTowerSetupOverlay();
+    return;
   }
+
+  showTowerSetupOverlay();
 }
 
 function closeSlotBuildMenu() {
   state.selectedSlotId = null;
-  questionOverlay.classList.remove("active");
-  questionOverlay.classList.remove("setup-passive");
   state.questionOpen = false;
 }
   
@@ -2140,15 +2135,16 @@ function placeStarterTower(slotId) {
   state.selectedBuildType = null;
   showTowerSetupOverlay();
 }
-
 function beginBattleAfterSetup() {
   if (state.starterBuildsRemaining > 0) return;
-  questionOverlay.classList.add("active");
-  questionOverlay.classList.remove("setup-passive");
+
   state.setupMode = false;
   state.questionOpen = false;
   state.selectedSlotId = null;
   state.paused = false;
+
+  questionOverlay.classList.remove("setup-passive");
+  questionOverlay.classList.remove("active");
 
   state.running = true;
   state.lastFrame = performance.now();
