@@ -2280,7 +2280,38 @@ function startNextLevel() {
   questionOverlay.classList.remove("active");
   state.questionOpen = false;
   logBox.innerHTML = "";
-  startLevel(state.currentLevelIndex + 1);
+
+  loadLevel(state.currentLevelIndex + 1);
+
+  state.running = false;
+  state.paused = false;
+  state.gameOver = false;
+  state.waveIndex = 0;
+  state.enemies = [];
+  state.projectiles = [];
+  state.enemyId = 0;
+  state.totalAnswered = 0;
+  state.totalCorrect = 0;
+  state.lastFrame = 0;
+  state.spawnTimer = 0;
+  state.enemiesSpawnedInWave = 0;
+  state.questionOpen = false;
+  state.awaitingWaveQuestion = false;
+  state.awaitingWaveUpgradeChoice = false;
+  state.killsSinceLastQuestion = 0;
+  state.pendingBuildType = null;
+  state.shopUnlocked = false;
+
+  clearBattlefieldEntities();
+  renderPlacedTowers();
+  renderCommandPanel();
+  updateStats();
+
+  state.running = true;
+  state.lastFrame = performance.now();
+  showWaveBanner("Wave 1");
+  logMessage(`Starting ${state.currentLevel.name} with existing defenses.`, "note");
+  requestAnimationFrame(gameLoop);
 }
   
 function resetCampaign() {
