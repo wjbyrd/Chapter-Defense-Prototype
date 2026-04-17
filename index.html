@@ -1214,8 +1214,8 @@ function placeTowerInSelectedSlot(type) {
   state.starterBuildsRemaining--;
   state.selectedSlotId = null;
 
-  if (state.starterBuildsRemaining === 0) {
-    showTowerSetupOverlay();
+  if (state.starterBuildsRemaining <= 0) {
+    beginBattleAfterSetup();
     return;
   }
 
