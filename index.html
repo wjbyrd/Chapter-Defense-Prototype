@@ -973,6 +973,7 @@ let state = {
   killsSinceLastQuestion: 0,
   setupMode: false,
   selectedBuildType: null,
+  selectedSlotId: null,
   starterBuildsRemaining: 3
 };
 
@@ -1158,6 +1159,84 @@ function startLevel(levelIndex) {
   requestAnimationFrame(gameLoop);
 }
 
+function renderSlotMarkers() {
+  document.querySelectorAll(".slot-marker").forEach(el => el.remove());
+
+  getCurrentWorldLayout().slots.forEach(slot => {
+    const placed = getPlacedTowerInSlot(slot.id);
+
+    const marker = document.createElement("button");
+    marker.className = "slot-marker";
+    marker.style.left = `${slot.x - 32}px`;
+    marker.textContent = placed ? TOWER_TYPES[placed.type].name.replace(" Tower", "") : `Slot ${slot.id + 1}`;
+
+    if (placed) {
+      marker.disabled = true;
+      marker.classList.add("filled");
+    } else if (state.setupMode) {
+      marker.addEventListener("click", () => openSlotBuildMenu(slot.id));
+    } else {
+      marker.disabled = true;
+    }
+
+    lane.appendChild(marker);
+  });
+}
+
+function openSlotBuildMenu(slotId) {
+  if (!state.setupMode) return;
+  if (state.starterBuildsRemaining <= 0) return;
+
+  state.selectedSlotId = slotId;
+
+  questionOverlay.classList.add("active");
+  state.questionOpen = true;
+  questionTitle.textContent = `Build on Slot ${slotId + 1}`;
+  questionTag.textContent = "Choose Tower";
+  questionText.textContent = "Pick the tower you want to place in this slot.";
+
+  answersBox.innerHTML = Object.values(TOWER_TYPES).map(tower => `
+    <button
+      class="answer-btn"
+      ${campaign.gold < tower.buildCost ? "disabled" : ""}
+      onclick="placeTowerInSelectedSlot('${tower.key}')"
+    >
+      ${tower.name} (${tower.buildCost}g)
+    </button>
+  `).join("") + `
+    <button class="answer-btn" onclick="closeSlotBuildMenu()">Cancel</button>
+  `;
+
+  resultBox.className = "resultbox";
+  resultBox.textContent = "";
+}
+
+function placeTowerInSelectedSlot(type) {
+  if (state.selectedSlotId === null) return;
+
+  const built = buildTower(type, state.selectedSlotId);
+  if (!built) return;
+
+  state.starterBuildsRemaining--;
+  state.selectedSlotId = null;
+
+  questionOverlay.classList.remove("active");
+  state.questionOpen = false;
+
+  renderPlacedTowers();
+
+  if (state.starterBuildsRemaining === 0) {
+    resultBox.className = "resultbox good";
+    resultBox.textContent = "";
+  }
+}
+
+function closeSlotBuildMenu() {
+  state.selectedSlotId = null;
+  questionOverlay.classList.remove("active");
+  state.questionOpen = false;
+}
+  
 function recordTagHistory(tag) {
   state.tagHistory.push(tag);
   if (state.tagHistory.length > RECENT_TAG_WINDOW) state.tagHistory.shift();
