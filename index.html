@@ -1076,6 +1076,7 @@ function resetLevelState() {
   resultBox.className = "resultbox";
   resultBox.textContent = "";
   state.selectedSlotId = null;
+  state.pendingBuildType = null;
   clearBattlefieldEntities();
   renderPlacedTowers();
 }
@@ -1188,6 +1189,8 @@ function placePendingTower(slotId) {
 
   logMessage(`${TOWER_TYPES[state.pendingBuildType].name} built in Slot ${slotId + 1}.`, "good");
   state.pendingBuildType = null;
+
+  renderSlotMarkers();
 
   if (state.awaitingWaveUpgradeChoice) {
     showWaveUpgradeChoice();
@@ -2030,6 +2033,8 @@ function beginTowerPlacement(type) {
   state.questionOpen = false;
   state.paused = false;
 
+  renderSlotMarkers();
+
   logMessage(`Placement mode: click an open slot to build ${TOWER_TYPES[type].name}.`, "note");
   showWaveBanner(`Place ${TOWER_TYPES[type].name}`);
 }
@@ -2407,7 +2412,6 @@ window.placeStarterTower = placeStarterTower;
 window.beginBattleAfterSetup = beginBattleAfterSetup;
 window.buyMetaUpgrade = buyMetaUpgrade;
 window.upgradeTower = upgradeTower;
-window.buildTowerInFirstOpenSlot = buildTowerInFirstOpenSlot;
 window.openSlotBuildMenu = openSlotBuildMenu;
 window.placeTowerInSelectedSlot = placeTowerInSelectedSlot;
 window.closeSlotBuildMenu = closeSlotBuildMenu;  
