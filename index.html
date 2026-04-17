@@ -1088,7 +1088,7 @@ function renderPlacedTowers() {
       <div class="tower-level">L${tower.level}</div>
     `;
 
-    if (state.shopUnlocked && state.upgradeMode && state.upgradeAction === "upgrade") {
+    if (state.shopUnlocked) {
       towerEl.addEventListener("click", () => upgradeTower(tower.id));
     } else {
       towerEl.disabled = true;
@@ -1166,11 +1166,8 @@ function renderSlotMarkers() {
       marker.classList.add("filled");
     } else if (state.setupMode) {
       marker.addEventListener("click", () => openSlotBuildMenu(slot.id));
-    } else if (state.shopUnlocked && state.upgradeMode && state.upgradeAction?.startsWith("build-")) {
-      marker.addEventListener("click", () => {
-        const type = state.upgradeAction.replace("build-", "");
-        placeUpgradeModeTower(type, slot.id);
-      });
+    } else if (state.shopUnlocked) {
+      marker.addEventListener("click", () => openUpgradeBuildMenu(slot.id));
     } else {
       marker.disabled = true;
     }
@@ -1179,9 +1176,40 @@ function renderSlotMarkers() {
   });
 }
 
+function openUpgradeBuildMenu(slotId) {
+  if (!state.shopUnlocked) return;
+
+  questionOverlay.classList.add("active");
+  state.questionOpen = true;
+  state.selectedSlotId = slotId;
+
+  questionTitle.textContent = `Build on Slot ${slotId + 1}`;
+  questionTag.textContent = "Upgrade Access";
+  questionText.textContent = "Choose a tower to build in this slot.";
+
+  answersBox.innerHTML = Object.values(TOWER_TYPES).map(tower => `
+    <button
+      class="answer-btn"
+      ${campaign.gold < tower.buildCost ? "disabled" : ""}
+      onclick="placeUpgradeModeTower('${tower.key}', ${slotId})"
+    >
+      ${tower.name} (${tower.buildCost}g)
+    </button>
+  `).join("") + `
+    <button class="answer-btn" onclick="closeOverlayResume()">Cancel</button>
+  `;
+
+  resultBox.className = "resultbox";
+  resultBox.textContent = "";
+}  
+
 function placeUpgradeModeTower(type, slotId) {
   const built = buildTower(type, slotId);
   if (!built) return;
+
+  questionOverlay.classList.remove("active");
+  state.questionOpen = false;
+  state.selectedSlotId = null;
 
   logMessage(`${TOWER_TYPES[type].name} built in Slot ${slotId + 1}.`, "good");
   renderPlacedTowers();
@@ -1459,7 +1487,12 @@ function renderCommandPanel() {
   if (!state.shopUnlocked) {
     panel.innerHTML = `
       <h2>Command Panel</h2>
-      <p>Answer questions correctly to unlock upgrades between waves.</p>
+      <p>Answer questions correctly to unlock upgrade access between waves.</p>
+      <div class="pill-list" style="margin-bottom:12px;">
+        <span class="pill">Gold: ${campaign.gold}</span>
+        <span class="pill">Placed Towers: ${campaign.towers.length}</span>
+        <span class="pill">Open Slots: ${getOpenSlots().length}</span>
+      </div>
       <div class="controls">
         <button class="primary" onclick="showLevelMap()">Open Level Map</button>
         <button class="secondary" onclick="showTowerGuide()">Tower Guide</button>
@@ -1471,17 +1504,11 @@ function renderCommandPanel() {
 
   panel.innerHTML = `
     <h2>Upgrade Access Unlocked</h2>
-    <p>Choose an action, then click a tower or empty slot on the battlefield.</p>
+    <p>Click a tower to upgrade it, or click an empty slot to build a new tower.</p>
     <div class="pill-list" style="margin-bottom:12px;">
       <span class="pill">Gold: ${campaign.gold}</span>
-      <span class="pill">Action: ${state.upgradeAction || "none"}</span>
+      <span class="pill">Placed Towers: ${campaign.towers.length}</span>
       <span class="pill">Open Slots: ${getOpenSlots().length}</span>
-    </div>
-    <div class="controls">
-      <button class="primary" onclick="setUpgradeAction('upgrade')">Upgrade Tower</button>
-      <button class="secondary" onclick="setUpgradeAction('build-single')">Build Preference</button>
-      <button class="secondary" onclick="setUpgradeAction('build-aoe')">Build Budget</button>
-      <button class="secondary" onclick="setUpgradeAction('build-slow')">Build Utility</button>
     </div>
     <div class="controls">
       <button class="primary" onclick="startNextWave()">Start Next Wave</button>
@@ -1490,7 +1517,7 @@ function renderCommandPanel() {
     </div>
   `;
 }
-
+  
 function getCurrentWave() {
   return state.currentLevel.waves[state.waveIndex];
 }
